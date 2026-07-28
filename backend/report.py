@@ -2,7 +2,7 @@
 report.py
 
 Turns the parsed findings + computed score into the plain-text report the
-user sees. Pure string formatting, no AI calls, no business logic —
+user sees. Pure string formatting, no AI calls, no business logic - 
 scoring.py already did that.
 """
 
@@ -13,12 +13,23 @@ DISCLAIMER = (
 )
 
 
-def build_report(provider: str, model_name: str, scoring_result: dict, usage: dict, raw_text: str, images_used: int = 1) -> str:
+def build_report(
+    provider: str,
+    model_name: str,
+    scoring_result: dict,
+    usage: dict,
+    raw_text: str,
+    images_used: int = 1,
+    pipeline: str = "single_pass",
+    quality_result: dict = None,
+    detection_result: dict = None,
+) -> str:
     lines = []
     lines.append("=" * 50)
-    lines.append("VIRTUAL SMILE ASSESSMENT — PRELIMINARY REPORT")
+    lines.append("VIRTUAL SMILE ASSESSMENT - PRELIMINARY REPORT")
     lines.append("=" * 50)
     lines.append(f"Provider / Model: {provider} ({model_name})")
+    lines.append(f"Pipeline: {pipeline}")
     lines.append(f"Images analyzed: {images_used}")
     lines.append("")
 
@@ -31,11 +42,7 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
         lines.append(raw_text if raw_text else "(model returned empty content)")
         lines.append("-" * 50)
         lines.append("")
-        lines.append("TOKEN USAGE (this request)")
-        lines.append(f"  Input tokens:  {usage['input_tokens']}")
-        lines.append(f"  Output tokens: {usage['output_tokens']}")
-        lines.append(f"  Total tokens:  {usage['total_tokens']}")
-        lines.append(f"  Latency:       {usage['latency_seconds']}s")
+        _append_usage(lines, usage)
         return "\n".join(lines)
 
     findings = scoring_result["findings"]
@@ -46,8 +53,43 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
     lines.append("Category breakdown:")
     for category, score in category_scores.items():
         label = category.replace("_", " ").title()
-        lines.append(f"  - {label}: {score} / 100")
+        lines.append(f" - {label}: {score} / 100")
     lines.append("")
+
+    observed_signs = findings.get("observed_signs", [])
+    if observed_signs:
+        lines.append("-" * 50)
+        lines.append("VISUAL EVIDENCE (from photo inspection)")
+        lines.append("-" * 50)
+        for sign in observed_signs:
+            if not isinstance(sign, dict):
+                continue
+            feature = sign.get("visible_feature", "")
+            location = sign.get("location", "")
+            views = sign.get("evidence_views", [])
+            strength = sign.get("evidence_strength", "")
+            conf = sign.get("confidence")
+            label = sign.get("concern_label", sign.get("sign", "")).replace("_", " ")
+            lines.append(f" - {label}")
+            if feature:
+                lines.append(f"      Seen: {feature}")
+            if location:
+                lines.append(f"      Location: {location}")
+            if views:
+                lines.append(f"      Views: {', '.join(views)}")
+            if strength:
+                lines.append(f"      Strength: {strength}")
+            if conf is not None:
+                lines.append(f"      Confidence: {conf}")
+        lines.append("")
+
+    not_assessable = findings.get("not_assessable_from_photo", [])
+    if not_assessable:
+        lines.append("Cannot assess from photos alone:")
+        for item in not_assessable:
+            lines.append(f" - {item.replace('_', ' ')}")
+        lines.append("")
+
     lines.append("-" * 50)
     lines.append("REPORT")
     lines.append("-" * 50)
@@ -60,7 +102,7 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
     lines.append("1. Visible concerns identified")
     if concerns:
         for c in concerns:
-            lines.append(f"   - {c.replace('_', ' ')}")
+            lines.append(f" - {c.replace('_', ' ')}")
     else:
         lines.append("   No obvious concerns identified in this photo.")
     lines.append("")
@@ -72,11 +114,11 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
             cause = detail.get("likely_cause") if detail else None
             label = c.replace("_", " ")
             if cause:
-                lines.append(f"   - {label}: {cause}")
+                lines.append(f" - {label}: {cause}")
             else:
-                lines.append(f"   - {label}: (no explanation provided by model)")
+                lines.append(f" - {label}: (no explanation provided by model)")
     else:
-        lines.append("   Not applicable — no concerns identified.")
+        lines.append("   Not applicable - no concerns identified.")
     lines.append("")
 
     lines.append("3. Possible treatment options")
@@ -86,11 +128,11 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
             options = detail.get("treatment_options") if detail else None
             label = c.replace("_", " ")
             if options:
-                lines.append(f"   - {label}: {', '.join(options)}")
+                lines.append(f" - {label}: {', '.join(options)}")
             else:
-                lines.append(f"   - {label}: (no options provided by model)")
+                lines.append(f" - {label}: (no options provided by model)")
     else:
-        lines.append("   Not applicable — no concerns identified.")
+        lines.append("   Not applicable - no concerns identified.")
     lines.append("")
 
     priority_order = findings.get("priority_order", [])
@@ -101,14 +143,14 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
     elif concerns:
         lines.append("   (model did not provide a priority order)")
     else:
-        lines.append("   Not applicable — no concerns identified.")
+        lines.append("   Not applicable - no concerns identified.")
     lines.append("")
 
     roadmap = findings.get("treatment_roadmap", [])
     lines.append("5. Suggested treatment roadmap")
     if roadmap:
         for step in roadmap:
-            lines.append(f"   - {step}")
+            lines.append(f" - {step}")
     else:
         lines.append("   (model did not provide a roadmap)")
     lines.append("")
@@ -119,6 +161,12 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
     confidence = findings.get("confidence")
     if confidence is not None:
         lines.append(f"Model confidence: {confidence}")
+
+    confidence_breakdown = findings.get("confidence_breakdown")
+    if confidence_breakdown:
+        lines.append("Confidence breakdown:")
+        for key, value in confidence_breakdown.items():
+            lines.append(f" - {key.replace('_', ' ')}: {value}")
     lines.append("")
 
     notes = findings.get("notes")
@@ -131,10 +179,72 @@ def build_report(provider: str, model_name: str, scoring_result: dict, usage: di
     lines.append(DISCLAIMER)
     lines.append("-" * 50)
     lines.append("")
+    _append_usage(lines, usage)
+    return "\n".join(lines)
+
+
+def _append_usage(lines: list, usage: dict) -> None:
     lines.append("TOKEN USAGE (this request)")
-    lines.append(f"  Input tokens:  {usage['input_tokens']}")
-    lines.append(f"  Output tokens: {usage['output_tokens']}")
-    lines.append(f"  Total tokens:  {usage['total_tokens']}")
-    lines.append(f"  Latency:       {usage['latency_seconds']}s")
+    lines.append(f"  Input tokens:  {usage.get('input_tokens')}")
+    lines.append(f"  Output tokens: {usage.get('output_tokens')}")
+    lines.append(f"  Total tokens:  {usage.get('total_tokens')}")
+    lines.append(f"  Latency:       {usage.get('latency_seconds')}s")
+
+    passes = usage.get("passes")
+    if passes:
+        lines.append("")
+        lines.append("Per-pass breakdown:")
+        for pass_name, pass_usage in passes.items():
+            lines.append(
+                f"  {pass_name}: "
+                f"in={pass_usage.get('input_tokens')} "
+                f"out={pass_usage.get('output_tokens')} "
+                f"latency={pass_usage.get('latency_seconds')}s"
+            )
+
+
+def build_groq_comparison_report(
+    scoring_result: dict,
+    usage: dict,
+    raw_text: str,
+    images_used: int,
+    vision_model: str,
+    metrics_model: str,
+    report_model: str,
+    vision_description: str,
+) -> str:
+    lines = []
+    lines.append("=" * 50)
+    lines.append("GROQ COMPARISON PIPELINE - PRELIMINARY REPORT")
+    lines.append("=" * 50)
+    lines.append(f"Pipeline: groq_comparison (3-step)")
+    lines.append(f"  1. Vision capture: {vision_model}")
+    lines.append(f"  2. Metrics structurer: {metrics_model}")
+    lines.append(f"  3. Report evaluator: {report_model}")
+    lines.append(f"Images analyzed: {images_used}")
+    lines.append("")
+
+    if vision_description:
+        lines.append("-" * 50)
+        lines.append("VISION CAPTURE (raw description from images)")
+        lines.append("-" * 50)
+        lines.append(vision_description)
+        lines.append("")
+
+    report_body = build_report(
+        provider="groq",
+        model_name=report_model,
+        scoring_result=scoring_result,
+        usage=usage,
+        raw_text=raw_text,
+        images_used=images_used,
+        pipeline="groq_comparison",
+    )
+    # Skip duplicate header from build_report - append from score section onward
+    score_marker = "OVERALL SMILE SCORE:"
+    if score_marker in report_body:
+        lines.append(report_body[report_body.index(score_marker):])
+    else:
+        lines.append(report_body)
 
     return "\n".join(lines)

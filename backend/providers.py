@@ -2,7 +2,7 @@
 providers.py
 
 One function per provider. Each takes a LIST of (image_bytes, mime_type)
-tuples — 1-3 photos of the same patient — plus the shared prompt, and
+tuples - 1-3 photos of the same patient - plus the shared prompt, and
 returns a common dict shape so the rest of the app doesn't need to know
 which provider was used:
 
@@ -15,7 +15,7 @@ which provider was used:
 }
 
 The mime_type is the browser's actual content_type for each upload (jpeg,
-png, etc). Passing the correct type per image matters — Anthropic
+png, etc). Passing the correct type per image matters - Anthropic
 specifically validates the declared media_type against the real image
 bytes and rejects mismatches (a PNG labeled as jpeg 400s outright).
 
@@ -59,7 +59,7 @@ def _normalize_mime_type(mime_type: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OpenAI — gpt-5.6-sol
+# OpenAI - gpt-5.6-sol
 # ---------------------------------------------------------------------------
 def call_openai(images: list, prompt: str, model: str = "gpt-5.6-sol") -> dict:
     from openai import OpenAI
@@ -136,9 +136,14 @@ def call_gemini(images: list, prompt: str, model: str = "gemini-3.5-flash-lite")
 
 
 # ---------------------------------------------------------------------------
-# Groq — qwen/qwen3.6-27b
+# Groq - qwen/qwen3.6-27b
 # ---------------------------------------------------------------------------
-def call_groq(images: list, prompt: str, model: str = "qwen/qwen3.6-27b") -> dict:
+def call_groq(
+    images: list,
+    prompt: str,
+    model: str = "qwen/qwen3.6-27b",
+    max_completion_tokens: int = 5500,
+) -> dict:
     from openai import OpenAI
 
     _require_images(images)
@@ -159,19 +164,15 @@ def call_groq(images: list, prompt: str, model: str = "qwen/qwen3.6-27b") -> dic
         )
 
     start = time.time()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": content}],
-        # qwen3.6-27b is a reasoning model — its <think> trace consumes the
-        # same token budget as the final answer. 5500 leaves headroom under
-        # the free-tier 8000 TPM rate limit alongside input tokens (which
-        # run higher with 2-3 images instead of 1 — watch this if you hit
-        # 413s again with multiple images).
-        max_completion_tokens=5500,
-        # Keep the reasoning trace out of message.content so we get clean
-        # JSON back instead of thinking text mixed with (or replacing) it.
-        extra_body={"reasoning_format": "hidden"},
-    )
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": content}],
+        "max_completion_tokens": max_completion_tokens,
+    }
+    if "qwen" in model.lower():
+        kwargs["extra_body"] = {"reasoning_format": "hidden"}
+
+    response = client.chat.completions.create(**kwargs)
     latency = time.time() - start
 
     raw_text = response.choices[0].message.content
@@ -186,7 +187,7 @@ def call_groq(images: list, prompt: str, model: str = "qwen/qwen3.6-27b") -> dic
 
 
 # ---------------------------------------------------------------------------
-# Claude (Anthropic) — added for curiosity, not a clinical-fit claim
+# Claude (Anthropic) - added for curiosity, not a clinical-fit claim
 # ---------------------------------------------------------------------------
 def call_claude(images: list, prompt: str, model: str = "claude-sonnet-5") -> dict:
     from anthropic import Anthropic
@@ -251,3 +252,157 @@ def call_provider(provider_key: str, images: list, prompt: str, model: str = Non
     if model:
         return fn(images, prompt, model=model)
     return fn(images, prompt)
+
+
+def call_openai_text(prompt: str, model: str = "gpt-4.1-nano") -> dict:
+    from openai import OpenAI
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set")
+
+    client = OpenAI(api_key=api_key)
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    latency = time.time() - start
+    raw_text = response.choices[0].message.content
+    usage = response.usage
+    return _to_common_shape(
+        raw_text=raw_text,
+        input_tokens=getattr(usage, "prompt_tokens", None),
+        output_tokens=getattr(usage, "completion_tokens", None),
+        latency_seconds=latency,
+    )
+
+
+def call_gemini_text(prompt: str, model: str = "gemini-3.5-flash-lite") -> dict:
+    from google import genai
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY not set")
+
+    client = genai.Client(api_key=api_key)
+    start = time.time()
+    response = client.models.generate_content(model=model, contents=prompt)
+    latency = time.time() - start
+    raw_text = response.text
+    usage = response.usage_metadata
+    return _to_common_shape(
+        raw_text=raw_text,
+        input_tokens=getattr(usage, "prompt_token_count", None),
+        output_tokens=getattr(usage, "candidates_token_count", None),
+        latency_seconds=latency,
+    )
+
+
+def call_groq_text(prompt: str, model: str = "qwen/qwen3.6-27b") -> dict:
+    from openai import OpenAI
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not set")
+
+    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+    start = time.time()
+
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_completion_tokens": 4096,
+    }
+    if "qwen" in model.lower():
+        kwargs["extra_body"] = {"reasoning_format": "hidden"}
+
+    response = client.chat.completions.create(**kwargs)
+    latency = time.time() - start
+    raw_text = response.choices[0].message.content
+    usage = response.usage
+    return _to_common_shape(
+        raw_text=raw_text,
+        input_tokens=getattr(usage, "prompt_tokens", None),
+        output_tokens=getattr(usage, "completion_tokens", None),
+        latency_seconds=latency,
+    )
+
+
+def call_groq_gpt_oss_text(
+    prompt: str,
+    model: str = "openai/gpt-oss-120b",
+    max_completion_tokens: int = 2048,
+    reasoning_effort: str = "low",
+) -> dict:
+    from openai import OpenAI
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not set")
+
+    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+    start = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_completion_tokens=max_completion_tokens,
+        temperature=1,
+        top_p=1,
+        extra_body={"reasoning_effort": reasoning_effort},
+    )
+    latency = time.time() - start
+    raw_text = response.choices[0].message.content
+    usage = response.usage
+    return _to_common_shape(
+        raw_text=raw_text,
+        input_tokens=getattr(usage, "prompt_tokens", None),
+        output_tokens=getattr(usage, "completion_tokens", None),
+        latency_seconds=latency,
+    )
+
+
+def call_claude_text(prompt: str, model: str = "claude-sonnet-5") -> dict:
+    from anthropic import Anthropic
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+
+    client = Anthropic(api_key=api_key)
+    start = time.time()
+    response = client.messages.create(
+        model=model,
+        max_tokens=2048,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    latency = time.time() - start
+    raw_text = "".join(
+        block.text for block in response.content if getattr(block, "type", None) == "text"
+    )
+    usage = response.usage
+    return _to_common_shape(
+        raw_text=raw_text,
+        input_tokens=getattr(usage, "input_tokens", None),
+        output_tokens=getattr(usage, "output_tokens", None),
+        latency_seconds=latency,
+    )
+
+
+TEXT_PROVIDER_FUNCTIONS = {
+    "openai": call_openai_text,
+    "gemini": call_gemini_text,
+    "groq": call_groq_text,
+    "claude": call_claude_text,
+}
+
+
+def call_provider_text(provider_key: str, prompt: str, model: str = None) -> dict:
+    if provider_key not in TEXT_PROVIDER_FUNCTIONS:
+        raise ValueError(
+            f"Unknown provider '{provider_key}'. Choose from: {list(TEXT_PROVIDER_FUNCTIONS)}"
+        )
+    fn = TEXT_PROVIDER_FUNCTIONS[provider_key]
+    if model:
+        return fn(prompt, model=model)
+    return fn(prompt)

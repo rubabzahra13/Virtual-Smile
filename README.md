@@ -66,6 +66,19 @@ Then open http://localhost:8000 in your browser. The FastAPI app serves
 both the API and the frontend HTML, so there's no separate frontend
 server to run.
 
+### Analysis pipeline (default: two-pass)
+
+1. **Code quality gate** — rejects very dark, tiny, or low-resolution images
+   before any LLM call (`image_quality.py`).
+2. **Pass 1 (vision)** — strict visual sign detection + category scores
+   using a dentist-style inspection protocol (`DETECTION_PROMPT`).
+3. **Pass 2 (text)** — patient-friendly explanations, treatment options,
+   and roadmap from Pass 1 data only (`build_explanation_prompt`).
+4. **Scoring** — deterministic weights in `scoring.py` (scores always from Pass 1).
+
+Uncheck "Two-pass pipeline" in the UI (or set `TWO_PASS_ENABLED=false` in
+`.env`) to fall back to a single combined vision call.
+
 ## Notes
 
 - Token usage shown (input/output/total tokens, latency) comes directly
