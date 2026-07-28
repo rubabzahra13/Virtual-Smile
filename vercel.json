@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "functions": {
+    "backend/main.py": {
+      "runtime": "python3.11",
+      "includeFiles": "frontend/**",
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend/main.py"
+    }
+  ]
+}
