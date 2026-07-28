@@ -1,15 +1,14 @@
 {
-  "version": 2,
   "functions": {
-    "backend/main.py": {
-      "includeFiles": "frontend/**",
+    "api/index.py": {
+      "includeFiles": "backend/**,frontend/**",
       "maxDuration": 60
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "backend/main.py"
+      "source": "/(.*)",
+      "destination": "/api/index.py"
     }
   ]
 }
