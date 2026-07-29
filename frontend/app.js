@@ -1011,6 +1011,15 @@
   function showAboutFlow() {
     const flow = $("#app-flow");
     const footer = $("#site-footer");
+    const shell = document.querySelector(".hero-shell");
+    const landing = $("#hero-landing");
+    const assess = $("#assess");
+    const orb = document.querySelector(".hero-orb-cta");
+    // Keep the landing hero exactly as-is; only reveal About below.
+    if (shell) shell.classList.remove("is-assessing");
+    if (landing) landing.hidden = false;
+    if (assess) assess.hidden = true;
+    if (orb) orb.hidden = false;
     if (flow) flow.hidden = false;
     if (footer) footer.hidden = false;
     document.body.classList.add("flow-open");

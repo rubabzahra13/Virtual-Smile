@@ -896,14 +896,15 @@ body.flow-open {
   height: auto;
 }
 
-body.flow-open .hero-shell {
+/* Only shrink/reshape the hero when entering the assessment flow — not About */
+body.flow-open .hero-shell.is-assessing {
   height: auto;
   max-height: none;
   overflow: visible;
   min-height: auto;
 }
 
-body.flow-open .hero-card {
+body.flow-open .hero-shell.is-assessing .hero-card {
   height: auto;
   min-height: min(720px, 92vh);
 }
