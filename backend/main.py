@@ -16,7 +16,7 @@ import os
 import hashlib
 import json
 from pathlib import Path
-from typing import Optional
+from typing import List, Literal, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from analysis import run_analysis
 from groq_comparison import run_groq_comparison
 from patient_features import build_chat_prompt, create_smile_simulation
-from providers import call_gemini_text
+from providers import call_groq_text
 from report import build_groq_comparison_report, build_report
 
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
@@ -58,7 +58,7 @@ MODEL_OPTIONS = {
 }
 
 DEFAULT_TWO_PASS = os.getenv("TWO_PASS_ENABLED", "true").lower() in ("1", "true", "yes")
-DEFAULT_PATIENT_MODEL = os.getenv("PATIENT_CHAT_MODEL", "gemini-3.5-flash-lite")
+DEFAULT_PATIENT_MODEL = os.getenv("PATIENT_CHAT_MODEL", "llama-3.1-8b-instant")
 DEFAULT_ANALYSIS_MODEL = os.getenv("GEMINI_ANALYSIS_MODEL", "gemini-3.5-flash-lite")
 DEFAULT_QUALITY_MODEL = os.getenv("GEMINI_QUALITY_MODEL", "gemini-3.5-flash-lite")
 ANALYSIS_CACHE_MAX_ITEMS = int(os.getenv("ANALYSIS_CACHE_MAX_ITEMS", "300"))
@@ -109,11 +109,17 @@ def _has_assessment_issues(scoring_result: dict) -> bool:
     return False
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=2)
     report_text: str = Field(..., min_length=10)
     overall_score: Optional[int] = None
     email: Optional[str] = None
+    history: List[ChatMessage] = Field(default_factory=list)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -279,9 +285,10 @@ async def chat(payload: ChatRequest):
         question=payload.question,
         report_text=payload.report_text,
         overall_score=payload.overall_score,
+        history=[m.model_dump() for m in payload.history],
     )
     try:
-        usage = call_gemini_text(prompt, model=DEFAULT_PATIENT_MODEL)
+        usage = call_groq_text(prompt, model=DEFAULT_PATIENT_MODEL)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -305,26 +312,36 @@ async def chat(payload: ChatRequest):
 async def simulate(
     front_image: UploadFile = File(...),
     report_text: Optional[str] = Form(None),
+    findings_json: Optional[str] = Form(None),
 ):
     front_bytes = await front_image.read()
     if not front_bytes:
         raise HTTPException(status_code=400, detail="Front smile image was empty.")
 
     try:
-        data_url = create_smile_simulation(front_bytes, report_text=report_text)
+        data_url = create_smile_simulation(
+            front_bytes,
+            report_text=report_text,
+            findings_json=findings_json,
+            mime_type=front_image.content_type or "image/jpeg",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Could not create simulation: {type(e).__name__}: {e}",
         )
 
+    engine = (os.getenv("SIMULATION_ENGINE") or "qwen").strip().lower()
+
     return {
         "image_data_url": data_url,
+        "engine": engine,
         "disclaimer": (
-            "Illustrative simulation only. Not a guaranteed clinical result. "
-            "A dentist consultation is required for treatment planning."
+            "Illustrative simulation only: treatments from your report applied as an edit "
+            "of the uploaded photo. Gap fills match existing teeth where shown. "
+            "Not a guaranteed clinical result. A dentist consultation is required for treatment planning."
         ),
-        "report_context_used": bool(report_text),
+        "report_context_used": bool(report_text or findings_json),
     }
 
 

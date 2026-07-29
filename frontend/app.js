@@ -14,7 +14,11 @@
     provider: "gemini",
     model: "gemini-3.5-flash-lite",
     qualityModel: "gemini-3.5-flash-lite",
+    chatUsed: 0,
+    chatHistory: [],
   };
+
+  const FREE_CHAT_LIMIT = 5;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -257,6 +261,50 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  function chatRemaining() {
+    return Math.max(0, FREE_CHAT_LIMIT - state.chatUsed);
+  }
+
+  function updateChatLimitUI() {
+    const note = $("#chat-limit-note");
+    const input = $("#chat-input");
+    const submit = $("#chat-submit") || $("#chat-form button[type='submit']");
+    const remaining = chatRemaining();
+
+    if (!note || !input) return;
+
+    if (remaining <= 0) {
+      note.textContent =
+        "You’ve used all 5 free questions for this assessment. For more personalised advice, please book a consultation with our dental team.";
+      note.classList.add("is-locked");
+      input.disabled = true;
+      input.placeholder = "Free questions used up for this assessment";
+      input.required = false;
+      if (submit) submit.disabled = true;
+      return;
+    }
+
+    note.classList.remove("is-locked");
+    input.disabled = false;
+    input.required = true;
+    input.placeholder = "e.g. Would aligners work for me?";
+    if (submit) submit.disabled = false;
+
+    if (remaining === FREE_CHAT_LIMIT) {
+      note.textContent = `You have ${remaining} free questions included with this assessment.`;
+    } else if (remaining === 1) {
+      note.textContent = "You have 1 free question left.";
+    } else {
+      note.textContent = `You have ${remaining} free questions left.`;
+    }
+  }
+
+  function resetChatLimit() {
+    state.chatUsed = 0;
+    state.chatHistory = [];
+    updateChatLimitUI();
+  }
+
   $("#details-form").addEventListener("submit", (e) => {
     e.preventDefault();
     state.email = $("#user-email").value.trim();
@@ -329,8 +377,9 @@
       }
 
       $("#chat-log").innerHTML = "";
+      resetChatLimit();
       addChatBubble(
-        "Hi - I’ve reviewed your assessment. Ask me anything about your Smile Score or suggested next steps.",
+        "Hi - I’ve reviewed your assessment. Ask me anything about your Smile Score or suggested next steps. You have 5 free questions included.",
         "bot"
       );
 
@@ -353,6 +402,9 @@
     const formData = new FormData();
     formData.append("front_image", state.frontFile);
     formData.append("report_text", state.reportText || "");
+    if (state.findings) {
+      formData.append("findings_json", JSON.stringify(state.findings));
+    }
 
     try {
       const res = await fetch("/simulate", { method: "POST", body: formData });
@@ -365,7 +417,8 @@
       btn.hidden = true;
       setStatus(
         status,
-        "Illustrative simulation only - not a guaranteed clinical result."
+        data.disclaimer
+          || "Illustrative simulation only - report treatments edited onto your uploaded photo."
       );
     } catch (err) {
       setStatus(status, err.message || "Could not generate preview.", true);
@@ -376,10 +429,22 @@
   $("#chat-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = $("#chat-input");
+    const submit = $("#chat-submit") || $("#chat-form button[type='submit']");
     const question = input.value.trim();
     if (!question) return;
+
+    if (chatRemaining() <= 0) {
+      updateChatLimitUI();
+      return;
+    }
+
+    state.chatUsed += 1;
+    updateChatLimitUI();
     input.value = "";
     addChatBubble(question, "user");
+    if (submit) submit.disabled = true;
+
+    const priorHistory = state.chatHistory.slice();
 
     try {
       const res = await fetch("/chat", {
@@ -390,16 +455,28 @@
           report_text: state.reportText,
           overall_score: state.overallScore,
           email: state.email,
+          history: priorHistory,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Chat failed.");
-      addChatBubble(data.answer, "bot");
+      const answer = data.answer || "";
+      addChatBubble(answer, "bot");
+      state.chatHistory.push({ role: "user", content: question });
+      state.chatHistory.push({ role: "assistant", content: answer });
     } catch (err) {
       addChatBubble(
         "Sorry - I couldn’t answer that just now. Please try again, or book a consultation for clinical advice.",
         "bot"
       );
+    } finally {
+      updateChatLimitUI();
+      if (chatRemaining() <= 0) {
+        addChatBubble(
+          "You’ve reached your 5 free questions for this assessment. If you’d like a deeper discussion, our team would be happy to help at a consultation.",
+          "bot"
+        );
+      }
     }
   });
 
@@ -476,6 +553,7 @@
     state.reportText = "";
     state.findings = null;
     state.simulationAllowed = true;
+    resetChatLimit();
     ["#front-image", "#left-image", "#right-image"].forEach((sel) => {
       const input = $(sel);
       const tile = input.closest(".upload-tile");

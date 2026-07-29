@@ -6,8 +6,9 @@
   <title>The Global Dentist - Virtual Smile Assessment</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/mobile.css?v=2" media="(max-width: 520px)" />
 </head>
 <body>
   <main id="top">
@@ -31,7 +32,22 @@
 
         <div class="hero-body" id="hero-landing">
           <div class="hero-copy">
-            <h1>Assess Your<br />Smile</h1>
+            <h1>
+              Assess Your<br />
+              <span class="h1-last-line">
+                Smile
+                <span class="h1-avatars" aria-hidden="true">
+                  <img src="/static/assets/avatar-1.png" alt="" />
+                  <img src="/static/assets/avatar-2.png" alt="" />
+                  <span class="avatar-more">+2k</span>
+                </span>
+              </span>
+            </h1>
+            <p class="hero-sub-inline">
+              Using <strong>advanced technology</strong>, we deliver
+              comprehensive treatments for a healthy,
+              <strong>confident smile.</strong>
+            </p>
             <div class="social-proof">
               <div class="avatars" aria-hidden="true">
                 <img src="/static/assets/avatar-1.png" alt="" />
@@ -97,6 +113,7 @@
                 <input type="checkbox" id="user-consent" required />
                 <span>I understand this is a preliminary AI assessment and not a clinical diagnosis.</span>
               </label>
+              <div class="form-spacer" aria-hidden="true"></div>
               <button type="submit" class="btn btn-primary">Continue to photos</button>
             </form>
           </div>
@@ -233,8 +250,9 @@
             <div class="sim-block" id="sim-block">
               <h4>Treatment simulation</h4>
               <p class="panel-lead">
-                An illustrative before-and-after preview of how recommended cosmetic treatments
-                might look. This is a visual simulation - not a guaranteed clinical result.
+                An AI edit of your uploaded photo showing the treatments from your
+                report - cleaning, whitening, and gap fills matched to your existing
+                teeth. This is a visual simulation only - not a guaranteed clinical result.
               </p>
               <div class="sim-grid">
                 <figure>
@@ -258,8 +276,11 @@
               <div id="chat-log" class="chat-log" aria-live="polite"></div>
               <form id="chat-form" class="chat-form">
                 <input type="text" id="chat-input" placeholder="e.g. Would aligners work for me?" required />
-                <button type="submit" class="btn btn-primary">Ask</button>
+                <button type="submit" class="btn btn-primary" id="chat-submit">Ask</button>
               </form>
+              <p id="chat-limit-note" class="chat-limit-note">
+                You have 5 free questions included with this assessment.
+              </p>
             </div>
 
             <div class="book-block">
