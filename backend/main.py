@@ -15,13 +15,15 @@ Endpoints:
 import os
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -45,8 +47,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    """Disable browser caching for frontend assets during local development."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path == "/" or path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
+app.add_middleware(NoCacheStaticMiddleware)
+
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+
+def _asset_version(filename: str) -> str:
+    path = FRONTEND_DIR / filename
+    try:
+        return str(int(path.stat().st_mtime))
+    except OSError:
+        return "1"
 
 MODEL_OPTIONS = {
     "gemini": [
@@ -122,12 +148,79 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = Field(default_factory=list)
 
 
+def _frontend_stamp() -> str:
+    """Max mtime across frontend source files — used for live reload."""
+    latest = 0
+    for path in FRONTEND_DIR.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in {".html", ".css", ".js"}:
+            continue
+        try:
+            latest = max(latest, int(path.stat().st_mtime))
+        except OSError:
+            continue
+    return str(latest)
+
+
+LIVE_RELOAD_SCRIPT = """
+<script>
+(function () {
+  var stamp = %STAMP%;
+  function check() {
+    fetch("/dev/frontend-version", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (String(data.stamp) !== String(stamp)) {
+          location.reload();
+        }
+      })
+      .catch(function () {});
+  }
+  setInterval(check, 800);
+})();
+</script>
+"""
+
+
+@app.get("/dev/frontend-version")
+def frontend_version():
+    return JSONResponse(
+        {"stamp": _frontend_stamp()},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def serve_frontend():
     index_path = FRONTEND_DIR / "index.html"
     if not index_path.exists():
         raise HTTPException(status_code=500, detail="frontend/index.html not found")
-    return index_path.read_text(encoding="utf-8")
+    html = index_path.read_text(encoding="utf-8")
+    # Bust browser cache whenever CSS/JS files change (mtime-based).
+    replacements = {
+        "/static/styles.css": f"/static/styles.css?v={_asset_version('styles.css')}",
+        "/static/mobile.css": f"/static/mobile.css?v={_asset_version('mobile.css')}",
+        "/static/app.js": f"/static/app.js?v={_asset_version('app.js')}",
+    }
+    for old, new in replacements.items():
+        html = re.sub(rf"{re.escape(old)}(?:\?v=[^\"']*)?", new, html)
+
+    stamp = _frontend_stamp()
+    reload_tag = LIVE_RELOAD_SCRIPT.replace("%STAMP%", json.dumps(stamp))
+    if "</body>" in html:
+        html = html.replace("</body>", reload_tag + "\n</body>", 1)
+    else:
+        html += reload_tag
+
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/models")
@@ -427,4 +520,12 @@ async def analyze_compare(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    frontend = str(FRONTEND_DIR)
+    backend = str(Path(__file__).resolve().parent)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_dirs=[backend, frontend],
+    )

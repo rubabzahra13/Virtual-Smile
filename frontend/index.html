@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
-  <link rel="stylesheet" href="/static/mobile.css?v=2" media="(max-width: 520px)" />
+  <link rel="stylesheet" href="/static/styles.css?v=booking2" />
+  <link rel="stylesheet" href="/static/mobile.css?v=booking2" />
 </head>
 <body>
   <main id="top">
@@ -16,7 +16,8 @@
       <div class="hero-card">
         <header class="hero-nav">
           <a class="brand-mark" href="#top" aria-label="The Global Dentist home">
-            <img src="/static/assets/logo.png?v=6" alt="The Global Dentist" width="44" height="44" />
+            <img src="/static/assets/logo.png?v=6" alt="" width="44" height="44" />
+            <span class="brand-name"><span class="brand-name-a">The Global</span> <span class="brand-name-b">Dentist</span></span>
           </a>
           <nav class="nav-links" aria-label="Primary">
             <a href="#how" data-go="about">About</a>
@@ -30,55 +31,94 @@
           </a>
         </header>
 
-        <div class="hero-body" id="hero-landing">
-          <div class="hero-copy">
-            <h1>
-              Assess Your<br />
-              <span class="h1-last-line">
-                Smile
-                <span class="h1-avatars" aria-hidden="true">
-                  <img src="/static/assets/avatar-1.png" alt="" />
-                  <img src="/static/assets/avatar-2.png" alt="" />
-                  <span class="avatar-more">+2k</span>
-                </span>
-              </span>
-            </h1>
-            <p class="hero-sub-inline">
-              Using <strong>advanced technology</strong>, we deliver
-              comprehensive treatments for a healthy,
-              <strong>confident smile.</strong>
-            </p>
-            <div class="social-proof">
-              <div class="avatars" aria-hidden="true">
-                <img src="/static/assets/avatar-1.png" alt="" />
-                <img src="/static/assets/avatar-2.png" alt="" />
-                <span class="avatar-more">+2k</span>
+        <div class="hero-slider" id="hero-landing" aria-roledescription="carousel" aria-label="Featured services">
+          <div class="hero-track" id="hero-track">
+            <article class="hero-slide hero-slide--assess is-active" data-slide="0" aria-label="Assess Your Smile">
+              <div class="hero-copy">
+                <h1>
+                  Assess Your<br />
+                  <span class="h1-last-line">
+                    Smile
+                    <span class="h1-avatars" aria-hidden="true">
+                      <img src="/static/assets/avatar-1.png" alt="" />
+                      <img src="/static/assets/avatar-2.png" alt="" />
+                      <span class="avatar-more">+2k</span>
+                    </span>
+                  </span>
+                </h1>
+                <p class="hero-sub-inline">
+                  Upload smile photos for a <strong>preliminary AI check</strong>,
+                  Smile Score, and suggested next steps.
+                  <strong>Not a diagnosis.</strong> Your dentist confirms in clinic.
+                </p>
+                <div class="social-proof">
+                  <div class="avatars" aria-hidden="true">
+                    <img src="/static/assets/avatar-1.png" alt="" />
+                    <img src="/static/assets/avatar-2.png" alt="" />
+                    <span class="avatar-more">+2k</span>
+                  </div>
+                  <p class="hero-sub">
+                    A quick preliminary AI check of visible smile concerns.
+                    Not a diagnosis - your dentist confirms next.
+                  </p>
+                </div>
               </div>
-              <p class="hero-sub">
-                A quick preliminary AI check of visible smile concerns.
-                Not a diagnosis - your dentist confirms next.
-              </p>
-            </div>
+
+              <div class="hero-visual">
+                <img
+                  class="hero-tooth"
+                  src="/static/assets/hero-tooth.png"
+                  alt="Illustrated tooth being restored by a dental team"
+                />
+              </div>
+
+              <div class="hero-patient">
+                <div class="stat-badge">
+                  <strong>98%</strong>
+                  <span>loyal dental patients.</span>
+                </div>
+                <img
+                  class="hero-woman"
+                  src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
+                  alt="Happy patient celebrating her smile"
+                />
+              </div>
+            </article>
+
+            <article class="hero-slide hero-slide--implants" data-slide="1" aria-label="AI Smile Analysis" aria-hidden="true">
+              <div class="implants-hero">
+                <div class="implants-title-stack" aria-label="AI Smile Analysis">
+                  <span class="implants-line implants-line--top">AI Smile</span>
+                  <span class="implants-line implants-line--bottom">Analysis</span>
+                  <img
+                    class="hero-implant"
+                    src="/static/assets/implant-cutout.png?v=4"
+                    alt=""
+                  />
+                </div>
+                <p class="hero-sub-inline implants-sub">
+                  Ask our AI chatbot about your Smile Score, findings, and next steps,
+                  in plain language from your assessment.
+                </p>
+              </div>
+
+              <div class="hero-patient implants-patient">
+                <div class="stat-badge implants-stat">
+                  <strong>98%</strong>
+                  <span>patients took the assessment.</span>
+                </div>
+                <img
+                  class="hero-woman hero-woman--implants"
+                  src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
+                  alt="Happy patient celebrating her smile"
+                />
+              </div>
+            </article>
           </div>
 
-          <div class="hero-visual">
-            <img
-              class="hero-tooth"
-              src="/static/assets/hero-tooth.png"
-              alt="Illustrated tooth being restored by a dental team"
-            />
-          </div>
-
-          <div class="hero-patient">
-            <div class="stat-badge">
-              <strong>98%</strong>
-              <span>loyal dental patients.</span>
-            </div>
-            <img
-              class="hero-woman"
-              src="/static/assets/hero-woman-v2-fixed.png?v=3"
-              alt="Happy patient celebrating her smile"
-            />
+          <div class="hero-dots" role="tablist" aria-label="Hero slides">
+            <button type="button" class="hero-dot is-active" data-slide-to="0" aria-label="Assess Your Smile" aria-selected="true"></button>
+            <button type="button" class="hero-dot" data-slide-to="1" aria-label="AI Smile Analysis" aria-selected="false"></button>
           </div>
         </div>
 
@@ -98,43 +138,57 @@
           </div>
 
           <div class="panel is-active" id="step-details" data-panel="1">
+            <span class="app-step-meta">Step 1 of 3 · Contact</span>
             <h3>Before we begin</h3>
             <p class="panel-lead">We’ll save your assessment so your dentist can review it ahead of your visit.</p>
             <form id="details-form" class="details-form">
-              <label>
-                Email
-                <input type="email" id="user-email" name="email" required placeholder="you@email.com" autocomplete="email" />
-              </label>
-              <label>
-                Mobile number
-                <input type="tel" id="user-phone" name="phone" required placeholder="+44 7XXX XXXXXX" autocomplete="tel" />
-              </label>
-              <label class="consent">
+              <div class="field-group">
+                <label class="field" for="user-email">
+                  <span class="field-label">Email</span>
+                  <input type="email" id="user-email" name="email" required placeholder="you@email.com" autocomplete="email" />
+                  <span class="field-feedback" id="email-feedback" aria-live="polite"></span>
+                </label>
+                <label class="field" for="user-phone">
+                  <span class="field-label">Mobile number</span>
+                  <span class="phone-input-row">
+                    <span class="phone-prefix" aria-hidden="true">+92</span>
+                    <input type="tel" id="user-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
+                  </span>
+                  <span class="field-feedback" id="phone-feedback" aria-live="polite"></span>
+                </label>
+              </div>
+              <label class="consent" for="user-consent">
                 <input type="checkbox" id="user-consent" required />
                 <span>I understand this is a preliminary AI assessment and not a clinical diagnosis.</span>
               </label>
+              <p class="field-feedback consent-feedback" id="consent-feedback" aria-live="polite"></p>
               <div class="form-spacer" aria-hidden="true"></div>
-              <button type="submit" class="btn btn-primary">Continue to photos</button>
+              <div class="details-actions">
+                <button type="submit" class="btn btn-primary" id="continue-to-photos" disabled>Continue to photos</button>
+              </div>
             </form>
           </div>
 
           <div class="panel" id="step-photos" data-panel="2" hidden>
-            <h3>Upload your smile photos</h3>
-            <p class="panel-lead">Front smile is all you need to run analysis. Side profiles are optional and can improve alignment and gum visibility accuracy.</p>
+            <span class="app-step-meta">Step 2 of 3 · Photos</span>
+            <h3>Upload photos</h3>
 
-            <div class="guidance">
-              <h4>Photo guidance</h4>
-              <ul>
-                <li>Stand in natural light or soft indoor lighting - avoid harsh flash glare.</li>
-                <li>Show your teeth clearly; lips gently parted or smiling wide.</li>
-                <li>Hold the camera at mouth level, straight on (not from above or below).</li>
-                <li>Use a clean background and remove lipstick if it covers the gumline.</li>
-                <li>Optional: left and right profiles help assess recession and arch form.</li>
+            <div class="photo-tips" aria-label="Quick photo tips">
+              <p class="photo-tips-title">Photo tips</p>
+              <ul class="photo-tips-list">
+                <li>Use natural light and avoid harsh flash</li>
+                <li>Show teeth clearly with a wide smile</li>
+                <li>Hold the camera at mouth level</li>
+                <li>Clean background works best</li>
               </ul>
             </div>
 
             <div class="upload-grid">
               <div class="upload-tile is-required" data-upload="front">
+                <div class="upload-meta">
+                  <span class="upload-title">Front smile <em class="upload-badge">Required</em></span>
+                  <span class="upload-hint">Face the camera directly</span>
+                </div>
                 <label class="upload-drop">
                   <input type="file" id="front-image" accept="image/*" required />
                   <div class="upload-media">
@@ -144,16 +198,19 @@
                     </span>
                     <img class="upload-preview" alt="Your front smile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">Add your photo</span>
+                    <span class="upload-add-overlay">
+                      <span class="upload-add-icon" aria-hidden="true">+</span>
+                      <span class="upload-add-text">Tap to add front smile</span>
+                    </span>
+                    <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
                 </label>
-                <div class="upload-meta">
-                  <span class="upload-title">Front smile</span>
-                  <span class="upload-hint">Required · face the camera directly</span>
-                </div>
-                <button type="button" class="upload-remove" hidden>Remove photo</button>
               </div>
               <div class="upload-tile" data-upload="left">
+                <div class="upload-meta">
+                  <span class="upload-title">Left</span>
+                  <span class="upload-hint">Optional</span>
+                </div>
                 <label class="upload-drop">
                   <input type="file" id="left-image" accept="image/*" />
                   <div class="upload-media">
@@ -163,16 +220,19 @@
                     </span>
                     <img class="upload-preview" alt="Your left profile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">Add your photo</span>
+                    <span class="upload-add-overlay">
+                      <span class="upload-add-icon" aria-hidden="true">+</span>
+                      <span class="upload-add-text">Add photo</span>
+                    </span>
+                    <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
                 </label>
-                <div class="upload-meta">
-                  <span class="upload-title">Left profile</span>
-                  <span class="upload-hint">Optional · turn slightly left</span>
-                </div>
-                <button type="button" class="upload-remove" hidden>Remove photo</button>
               </div>
               <div class="upload-tile" data-upload="right">
+                <div class="upload-meta">
+                  <span class="upload-title">Right</span>
+                  <span class="upload-hint">Optional</span>
+                </div>
                 <label class="upload-drop">
                   <input type="file" id="right-image" accept="image/*" />
                   <div class="upload-media">
@@ -182,14 +242,13 @@
                     </span>
                     <img class="upload-preview" alt="Your right profile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">Add your photo</span>
+                    <span class="upload-add-overlay">
+                      <span class="upload-add-icon" aria-hidden="true">+</span>
+                      <span class="upload-add-text">Add photo</span>
+                    </span>
+                    <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
                 </label>
-                <div class="upload-meta">
-                  <span class="upload-title">Right profile</span>
-                  <span class="upload-hint">Optional · turn slightly right</span>
-                </div>
-                <button type="button" class="upload-remove" hidden>Remove photo</button>
               </div>
             </div>
 
@@ -201,28 +260,33 @@
           </div>
 
           <div class="panel" id="step-results" data-panel="3" hidden>
+            <span class="app-step-meta">Step 3 of 3 · Results</span>
             <div class="results-hero">
-              <div class="score-ring-wrap">
-                <svg class="score-ring" viewBox="0 0 120 120" aria-hidden="true">
-                  <circle class="score-ring-track" cx="60" cy="60" r="52" />
-                  <circle class="score-ring-value" cx="60" cy="60" r="52" />
-                </svg>
-                <div class="score-ring-label">
-                  <span id="overall-score">-</span>
-                  <small>/ 100</small>
+              <div class="results-hero-top">
+                <div class="score-ring-wrap">
+                  <svg class="score-ring" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="score-ring-track" cx="60" cy="60" r="52" />
+                    <circle class="score-ring-value" cx="60" cy="60" r="52" />
+                  </svg>
+                  <div class="score-ring-label">
+                    <span id="overall-score">-</span>
+                    <small>/ 100</small>
+                  </div>
+                </div>
+                <div class="results-hero-copy">
+                  <h3>Your Smile Score</h3>
+                  <p id="results-summary" class="panel-lead">Your preliminary visual assessment is ready.</p>
+                  <p class="disclaimer-inline">Not a diagnosis. Clinical confirmation is required.</p>
                 </div>
               </div>
-              <div>
-                <h3>Your Smile Score</h3>
-                <p id="results-summary" class="panel-lead">Your preliminary visual assessment is ready.</p>
-                <p class="disclaimer-inline">Not a diagnosis. Clinical confirmation is required.</p>
+              <div class="scores-block" id="scores-block">
+                <h4 class="scores-block-title">Category breakdown</h4>
+                <div class="category-scores" id="category-scores"></div>
               </div>
             </div>
 
-            <div class="category-scores" id="category-scores"></div>
-
             <div class="report-block patient-report">
-              <h4>Your visual findings</h4>
+              <h4>Visual findings</h4>
               <p class="panel-lead" id="report-summary-text">
                 A simple summary of what was visible in your photo(s).
               </p>
@@ -236,13 +300,6 @@
               <p class="patient-notes" id="patient-notes" hidden></p>
             </div>
 
-            <div class="report-block technical-report">
-              <details>
-                <summary>View technical report</summary>
-                <pre id="report-text" class="report-text"></pre>
-              </details>
-            </div>
-
             <p class="panel-lead" id="sim-skip-note" hidden>
               No treatment simulation is shown because no visible issues were identified in this assessment.
             </p>
@@ -250,9 +307,7 @@
             <div class="sim-block" id="sim-block">
               <h4>Treatment simulation</h4>
               <p class="panel-lead">
-                An AI edit of your uploaded photo showing the treatments from your
-                report - cleaning, whitening, and gap fills matched to your existing
-                teeth. This is a visual simulation only - not a guaranteed clinical result.
+                Visual preview of possible treatments from your report. Simulation only, not a clinical result.
               </p>
               <div class="sim-grid">
                 <figure>
@@ -260,33 +315,20 @@
                   <img id="sim-before" alt="Your uploaded smile" />
                 </figure>
                 <figure>
-                  <figcaption>After (simulation)</figcaption>
+                  <figcaption>After</figcaption>
                   <div class="sim-after-wrap">
                     <img id="sim-after" alt="Simulated treatment preview" hidden />
-                    <button type="button" class="btn btn-primary" id="generate-sim">Generate preview</button>
+                    <button type="button" class="btn btn-primary" id="generate-sim">Generate</button>
                   </div>
                 </figure>
               </div>
               <p id="sim-status" class="status"></p>
             </div>
 
-            <div class="chat-block">
-              <h4>Ask about your report</h4>
-              <p class="panel-lead">Questions about your Smile Score or suggested treatments - answered in plain language.</p>
-              <div id="chat-log" class="chat-log" aria-live="polite"></div>
-              <form id="chat-form" class="chat-form">
-                <input type="text" id="chat-input" placeholder="e.g. Would aligners work for me?" required />
-                <button type="submit" class="btn btn-primary" id="chat-submit">Ask</button>
-              </form>
-              <p id="chat-limit-note" class="chat-limit-note">
-                You have 5 free questions included with this assessment.
-              </p>
-            </div>
-
             <div class="book-block">
-              <h4>Ready for a clinical consultation?</h4>
-              <p>Book an appointment so our team can confirm findings and design your personalised treatment plan.</p>
-              <a class="btn btn-primary" href="mailto:hello@theglobaldentist.com?subject=Virtual%20Smile%20Assessment%20booking">Book an appointment</a>
+              <h4>Book a consultation</h4>
+              <p>Confirm findings and get a personalised treatment plan.</p>
+              <button type="button" class="btn btn-primary" id="open-book-modal">Book an appointment</button>
             </div>
 
             <button type="button" class="btn btn-ghost" id="start-over">Start a new assessment</button>
@@ -301,9 +343,10 @@
             <path id="orbCircle" d="M70,70 m-48,0 a48,48 0 1,1 96,0 a48,48 0 1,1 -96,0" />
           </defs>
           <text>
-            <textPath href="#orbCircle" startOffset="0%">
-              START ASSESSMENT • START ASSESSMENT • START ASSESSMENT •
-            </textPath>
+            <textPath href="#orbCircle" startOffset="0%">START ASSESSMENT</textPath>
+          </text>
+          <text>
+            <textPath href="#orbCircle" startOffset="50%">START ASSESSMENT</textPath>
           </text>
         </svg>
       </a>
@@ -344,11 +387,115 @@
     </div>
   </main>
 
+  <div class="chat-float" id="chat-float" hidden>
+    <div class="chat-panel" id="chat-panel" hidden>
+      <div class="chat-head">
+        <div class="chat-head-copy">
+          <h4>Ask about your report</h4>
+          <p class="panel-lead">Answers from your assessment only.</p>
+        </div>
+        <div class="chat-head-actions">
+          <span class="chat-quota" id="chat-quota">5 left</span>
+          <button type="button" class="chat-close" id="chat-close" aria-label="Close chat">×</button>
+        </div>
+      </div>
+      <div id="chat-log" class="chat-log" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <input type="text" id="chat-input" placeholder="Ask a question…" required />
+        <button type="submit" class="btn btn-primary" id="chat-submit">Ask</button>
+      </form>
+      <p id="chat-limit-note" class="chat-limit-note" hidden></p>
+    </div>
+    <button type="button" class="chat-fab" id="chat-fab" aria-expanded="false" aria-controls="chat-panel">
+      <span class="chat-fab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H7l-4 3V12A8.5 8.5 0 1 1 21 12z" />
+        </svg>
+      </span>
+      <span class="chat-fab-label">Ask about report</span>
+    </button>
+  </div>
+
+  <div class="book-modal" id="book-modal" hidden>
+    <div class="book-modal-backdrop" data-book-close></div>
+    <div class="book-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="book-modal-title">
+      <div class="book-modal-head">
+        <div>
+          <h3 id="book-modal-title">Book an appointment</h3>
+          <p>Choose a date and time. We’ll confirm by email or phone.</p>
+        </div>
+        <button type="button" class="book-modal-close" data-book-close aria-label="Close">×</button>
+      </div>
+
+      <form id="book-form" class="book-form">
+        <label class="field" for="book-name">
+          <span class="field-label">Full name</span>
+          <input type="text" id="book-name" name="name" required placeholder="Your name" autocomplete="name" />
+        </label>
+        <label class="field" for="book-email">
+          <span class="field-label">Email</span>
+          <input type="email" id="book-email" name="email" required placeholder="you@email.com" autocomplete="email" />
+        </label>
+        <label class="field" for="book-phone">
+          <span class="field-label">Mobile number</span>
+          <span class="phone-input-row">
+            <span class="phone-prefix" aria-hidden="true">+92</span>
+            <input type="tel" id="book-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
+          </span>
+        </label>
+        <div class="book-schedule">
+          <div class="field">
+            <label class="field-label" for="book-date">Preferred date</label>
+            <input type="date" id="book-date" name="date" required />
+            <div
+              class="book-date-strip"
+              id="book-date-strip"
+              role="listbox"
+              aria-label="Quick date picks"
+            ></div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="book-time">Preferred time</label>
+            <input type="time" id="book-time" name="time" required step="900" min="09:00" max="20:00" />
+            <p class="book-hint">Clinic hours 9:00 AM – 8:00 PM. Pick any time, or use a quick slot.</p>
+            <div
+              class="book-time-grid"
+              id="book-time-grid"
+              role="listbox"
+              aria-label="Quick time picks"
+            >
+              <button type="button" class="book-time-slot" data-time="10:00">10:00 AM</button>
+              <button type="button" class="book-time-slot" data-time="11:00">11:00 AM</button>
+              <button type="button" class="book-time-slot" data-time="12:00">12:00 PM</button>
+              <button type="button" class="book-time-slot" data-time="14:00">2:00 PM</button>
+              <button type="button" class="book-time-slot" data-time="15:00">3:00 PM</button>
+              <button type="button" class="book-time-slot" data-time="16:00">4:00 PM</button>
+              <button type="button" class="book-time-slot" data-time="17:00">5:00 PM</button>
+              <button type="button" class="book-time-slot" data-time="18:00">6:00 PM</button>
+            </div>
+          </div>
+        </div>
+        <label class="field" for="book-note">
+          <span class="field-label">Note <span class="field-optional">(optional)</span></span>
+          <textarea id="book-note" name="note" rows="2" placeholder="Anything we should know before your visit?"></textarea>
+        </label>
+        <p id="book-status" class="status" role="status"></p>
+        <button type="submit" class="btn btn-primary" id="book-submit">Request appointment</button>
+      </form>
+
+      <div class="book-success" id="book-success" hidden>
+        <h4>Request received</h4>
+        <p id="book-success-copy">We’ll confirm your preferred slot shortly.</p>
+        <button type="button" class="btn btn-primary" data-book-close>Done</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="site-footer" id="site-footer" hidden>
     <img src="/static/assets/logo.png?v=6" alt="The Global Dentist" width="48" height="48" />
     <p>© The Global Dentist · Virtual Smile Assessment · Preliminary AI tool only - not a diagnosis</p>
   </footer>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=booking2"></script>
 </body>
 </html>
