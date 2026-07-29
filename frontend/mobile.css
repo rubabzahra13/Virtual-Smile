@@ -1611,6 +1611,7 @@
     width: min(var(--cluster-max-w), calc(var(--cluster-max-h) * 0.75)) !important;
     height: min(var(--cluster-max-h), calc(var(--cluster-max-w) / 0.75)) !important;
     transform: none !important;
+    overflow: hidden !important;
   }
 
   .hero-woman--implants {
@@ -1620,7 +1621,7 @@
     max-height: none !important;
     object-fit: contain !important;
     object-position: bottom right !important;
-    transform: translateX(18%) !important;
+    transform: translate(18%, 24%) !important;
   }
 
   .implants-patient .implants-stat {

@@ -21,14 +21,8 @@
           </a>
           <nav class="nav-links" aria-label="Primary">
             <a href="#how" data-go="about">About</a>
-            <a href="#assess" data-go="assess">Results</a>
             <a href="#assess" data-go="assess">Assessment</a>
-            <a href="#how" data-go="about">Reviews</a>
           </nav>
-          <a class="nav-contact" href="mailto:hello@theglobaldentist.com">
-            Contacts
-            <span class="nav-contact-icon" aria-hidden="true">↗</span>
-          </a>
         </header>
 
         <div class="hero-slider" id="hero-landing" aria-roledescription="carousel" aria-label="Featured services">
@@ -106,10 +100,6 @@
 
               <div class="hero-patient implants-patient">
                 <div class="patient-cluster patient-cluster--implants">
-                  <div class="stat-badge implants-stat">
-                    <strong>98%</strong>
-                    <span>patients took the assessment.</span>
-                  </div>
                   <img
                     class="hero-woman hero-woman--implants"
                     src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
@@ -213,7 +203,7 @@
                 </div>
                 <div class="upload-drop">
                   <input type="file" id="left-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
-                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="environment" hidden aria-hidden="true" />
+                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="user" hidden aria-hidden="true" />
                   <div class="upload-media">
                     <span class="upload-example" aria-hidden="true">
                       <img src="/static/assets/example-left.png" alt="" />
@@ -236,7 +226,7 @@
                 </div>
                 <div class="upload-drop">
                   <input type="file" id="right-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
-                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="environment" hidden aria-hidden="true" />
+                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="user" hidden aria-hidden="true" />
                   <div class="upload-media">
                     <span class="upload-example" aria-hidden="true">
                       <img src="/static/assets/example-right.png" alt="" />
@@ -555,6 +545,15 @@
       <div class="camera-capture-stage">
         <video id="camera-video" playsinline autoplay muted></video>
         <canvas id="camera-canvas" hidden></canvas>
+        <button type="button" class="camera-flip-btn" id="camera-flip" aria-label="Switch camera" title="Switch front / back camera">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M16 3h5v5" />
+            <path d="M8 21H3v-5" />
+            <path d="M21 8A9 9 0 0 0 7.5 4.2L3 8" />
+            <path d="M3 16a9 9 0 0 0 13.5 3.8L21 16" />
+          </svg>
+          <span id="camera-flip-label">Front</span>
+        </button>
         <p id="camera-status" class="camera-status" role="status"></p>
       </div>
       <div class="camera-capture-actions">

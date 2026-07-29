@@ -134,12 +134,66 @@
   let pendingPhotoTile = null;
   let cameraStream = null;
   let cameraTile = null;
+  let cameraFacing = "user"; // default front camera
 
   function uploadKeyForTile(tile) {
     const kind = tile?.dataset.upload;
     if (kind === "left") return "leftFile";
     if (kind === "right") return "rightFile";
     return "frontFile";
+  }
+
+  function updateCameraFlipLabel() {
+    const label = $("#camera-flip-label");
+    const flip = $("#camera-flip");
+    const isFront = cameraFacing === "user";
+    if (label) label.textContent = isFront ? "Front" : "Back";
+    if (flip) {
+      flip.setAttribute("aria-label", isFront ? "Switch to back camera" : "Switch to front camera");
+    }
+  }
+
+  async function startCameraStream(facing) {
+    const video = $("#camera-video");
+    const status = $("#camera-status");
+    const shutter = $("#camera-shutter");
+    const mode = facing === "environment" ? "environment" : "user";
+    cameraFacing = mode;
+    updateCameraFlipLabel();
+
+    const attempts = [
+      { video: { facingMode: { exact: mode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: mode }, audio: false },
+      { video: true, audio: false },
+    ];
+
+    let lastError = null;
+    for (const constraints of attempts) {
+      try {
+        stopCameraStream();
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (video) {
+          video.srcObject = cameraStream;
+          video.classList.toggle("is-mirrored", cameraFacing === "user");
+          await video.play().catch(() => {});
+        }
+        if (status) status.textContent = "";
+        if (shutter) shutter.disabled = false;
+        return true;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (status) {
+      status.textContent =
+        lastError?.name === "NotAllowedError"
+          ? "Camera permission blocked. Allow camera access, or upload from your library."
+          : "Could not open camera. Try uploading from your library instead.";
+    }
+    if (shutter) shutter.disabled = true;
+    return false;
   }
 
   function closePhotoSourceSheet() {
@@ -176,6 +230,7 @@
   function closeCameraCapture() {
     stopCameraStream();
     cameraTile = null;
+    cameraFacing = "user";
     const modal = $("#camera-capture");
     const status = $("#camera-status");
     const shutter = $("#camera-shutter");
@@ -183,19 +238,19 @@
     if (status) status.textContent = "";
     if (shutter) shutter.disabled = true;
     document.body.classList.remove("camera-open");
+    updateCameraFlipLabel();
   }
 
   async function openCameraCapture(tile) {
     if (!tile || state.photosLocked) return;
     if (!navigator.mediaDevices?.getUserMedia) {
-      // Fallback: native capture input (mostly mobile).
       tile.querySelector(".upload-input--camera")?.click();
       return;
     }
 
     cameraTile = tile;
+    cameraFacing = "user";
     const modal = $("#camera-capture");
-    const video = $("#camera-video");
     const status = $("#camera-status");
     const shutter = $("#camera-shutter");
     const title = $("#camera-capture-title");
@@ -213,43 +268,18 @@
     if (shutter) shutter.disabled = true;
     if (modal) modal.hidden = false;
     document.body.classList.add("camera-open");
+    updateCameraFlipLabel();
+    await startCameraStream("user");
+  }
 
-    const preferUser = tile.dataset.upload === "front";
-    const attempts = preferUser
-      ? [
-          { video: { facingMode: { ideal: "user" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-          { video: true, audio: false },
-        ]
-      : [
-          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-          { video: { facingMode: { ideal: "user" } }, audio: false },
-          { video: true, audio: false },
-        ];
-
-    let lastError = null;
-    for (const constraints of attempts) {
-      try {
-        stopCameraStream();
-        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (video) {
-          video.srcObject = cameraStream;
-          video.classList.toggle("is-mirrored", preferUser);
-          await video.play().catch(() => {});
-        }
-        if (status) status.textContent = "";
-        if (shutter) shutter.disabled = false;
-        return;
-      } catch (err) {
-        lastError = err;
-      }
-    }
-
-    if (status) {
-      status.textContent =
-        lastError?.name === "NotAllowedError"
-          ? "Camera permission blocked. Allow camera access, or upload from your library."
-          : "Could not open camera. Try uploading from your library instead.";
-    }
+  async function flipCamera() {
+    const next = cameraFacing === "user" ? "environment" : "user";
+    const status = $("#camera-status");
+    const flip = $("#camera-flip");
+    if (status) status.textContent = next === "user" ? "Switching to front…" : "Switching to back…";
+    if (flip) flip.disabled = true;
+    await startCameraStream(next);
+    if (flip) flip.disabled = false;
   }
 
   function captureCameraPhoto() {
@@ -266,8 +296,8 @@
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    // Mirror selfie preview for front smile so capture matches what users see.
-    if (tile.dataset.upload === "front") {
+    // Mirror capture when using front camera so it matches the mirrored preview.
+    if (cameraFacing === "user") {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
@@ -381,6 +411,9 @@
       el.addEventListener("click", closeCameraCapture);
     });
     $("#camera-shutter")?.addEventListener("click", captureCameraPhoto);
+    $("#camera-flip")?.addEventListener("click", () => {
+      flipCamera();
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
