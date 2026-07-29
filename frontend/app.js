@@ -68,22 +68,19 @@
 
   function setPhotosLocked(locked) {
     state.photosLocked = !!locked;
-    [
-      ["#front-image", "frontFile"],
-      ["#left-image", "leftFile"],
-      ["#right-image", "rightFile"],
-    ].forEach(([inputSel]) => {
-      const input = $(inputSel);
-      if (!input) return;
-      const tile = input.closest(".upload-tile");
-      const removeBtn = tile?.querySelector(".upload-remove");
-      input.disabled = state.photosLocked;
-      if (tile) tile.classList.toggle("is-locked", state.photosLocked);
+    $$(".upload-tile").forEach((tile) => {
+      const removeBtn = tile.querySelector(".upload-remove");
+      const openBtn = tile.querySelector("[data-open-photo-source]");
+      tile.querySelectorAll(".upload-input").forEach((input) => {
+        input.disabled = state.photosLocked;
+      });
+      tile.classList.toggle("is-locked", state.photosLocked);
+      if (openBtn) openBtn.disabled = state.photosLocked;
       if (removeBtn) {
         if (state.photosLocked) {
           removeBtn.hidden = true;
           removeBtn.disabled = true;
-        } else if (tile?.classList.contains("has-file")) {
+        } else if (tile.classList.contains("has-file")) {
           removeBtn.hidden = false;
           removeBtn.disabled = false;
         }
@@ -97,7 +94,9 @@
       URL.revokeObjectURL(input._previewUrl);
       input._previewUrl = null;
     }
-    input.value = "";
+    tile.querySelectorAll(".upload-input").forEach((el) => {
+      el.value = "";
+    });
     state[key] = null;
     tile.classList.remove("has-file");
     const preview = tile.querySelector(".upload-preview");
@@ -132,36 +131,264 @@
     $("#run-analysis").disabled = !state.frontFile;
   }
 
+  let pendingPhotoTile = null;
+  let cameraStream = null;
+  let cameraTile = null;
+
+  function uploadKeyForTile(tile) {
+    const kind = tile?.dataset.upload;
+    if (kind === "left") return "leftFile";
+    if (kind === "right") return "rightFile";
+    return "frontFile";
+  }
+
+  function closePhotoSourceSheet() {
+    const sheet = $("#photo-source-sheet");
+    if (sheet) sheet.hidden = true;
+    pendingPhotoTile = null;
+    document.body.classList.remove("photo-source-open");
+  }
+
+  function openPhotoSourceSheet(tile) {
+    if (!tile || state.photosLocked || tile.classList.contains("has-file")) return;
+    pendingPhotoTile = tile;
+    const sheet = $("#photo-source-sheet");
+    const title = $("#photo-source-title");
+    if (title) {
+      const label = tile.querySelector(".upload-title")?.childNodes?.[0]?.textContent?.trim() || "photo";
+      title.textContent = `Add ${label.toLowerCase()}`;
+    }
+    if (sheet) sheet.hidden = false;
+    document.body.classList.add("photo-source-open");
+  }
+
+  function stopCameraStream() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      cameraStream = null;
+    }
+    const video = $("#camera-video");
+    if (video) {
+      video.srcObject = null;
+    }
+  }
+
+  function closeCameraCapture() {
+    stopCameraStream();
+    cameraTile = null;
+    const modal = $("#camera-capture");
+    const status = $("#camera-status");
+    const shutter = $("#camera-shutter");
+    if (modal) modal.hidden = true;
+    if (status) status.textContent = "";
+    if (shutter) shutter.disabled = true;
+    document.body.classList.remove("camera-open");
+  }
+
+  async function openCameraCapture(tile) {
+    if (!tile || state.photosLocked) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      // Fallback: native capture input (mostly mobile).
+      tile.querySelector(".upload-input--camera")?.click();
+      return;
+    }
+
+    cameraTile = tile;
+    const modal = $("#camera-capture");
+    const video = $("#camera-video");
+    const status = $("#camera-status");
+    const shutter = $("#camera-shutter");
+    const title = $("#camera-capture-title");
+    const hint = $("#camera-capture-hint");
+    const label = tile.querySelector(".upload-title")?.childNodes?.[0]?.textContent?.trim() || "photo";
+
+    if (title) title.textContent = `Take ${label.toLowerCase()}`;
+    if (hint) {
+      hint.textContent =
+        tile.dataset.upload === "front"
+          ? "Face the camera and smile, then capture."
+          : "Hold a side angle of your smile, then capture.";
+    }
+    if (status) status.textContent = "Starting camera…";
+    if (shutter) shutter.disabled = true;
+    if (modal) modal.hidden = false;
+    document.body.classList.add("camera-open");
+
+    const preferUser = tile.dataset.upload === "front";
+    const attempts = preferUser
+      ? [
+          { video: { facingMode: { ideal: "user" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+          { video: true, audio: false },
+        ]
+      : [
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+          { video: { facingMode: { ideal: "user" } }, audio: false },
+          { video: true, audio: false },
+        ];
+
+    let lastError = null;
+    for (const constraints of attempts) {
+      try {
+        stopCameraStream();
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (video) {
+          video.srcObject = cameraStream;
+          video.classList.toggle("is-mirrored", preferUser);
+          await video.play().catch(() => {});
+        }
+        if (status) status.textContent = "";
+        if (shutter) shutter.disabled = false;
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (status) {
+      status.textContent =
+        lastError?.name === "NotAllowedError"
+          ? "Camera permission blocked. Allow camera access, or upload from your library."
+          : "Could not open camera. Try uploading from your library instead.";
+    }
+  }
+
+  function captureCameraPhoto() {
+    const tile = cameraTile;
+    const video = $("#camera-video");
+    const canvas = $("#camera-canvas");
+    const status = $("#camera-status");
+    if (!tile || !video || !canvas || !cameraStream) return;
+    if (!video.videoWidth || !video.videoHeight) {
+      if (status) status.textContent = "Camera is still starting. Try again in a moment.";
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    // Mirror selfie preview for front smile so capture matches what users see.
+    if (tile.dataset.upload === "front") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          if (status) status.textContent = "Could not capture photo. Please try again.";
+          return;
+        }
+        const gallery = tile.querySelector(".upload-input--gallery");
+        const key = uploadKeyForTile(tile);
+        const file = new File([blob], `${tile.dataset.upload || "smile"}-capture.jpg`, {
+          type: "image/jpeg",
+        });
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          if (gallery) gallery.files = dt.files;
+        } catch (_) {
+          /* state still holds the File */
+        }
+        setUploadTileFile(tile, gallery || tile.querySelector(".upload-input"), key, file);
+        closeCameraCapture();
+      },
+      "image/jpeg",
+      0.92
+    );
+  }
+
   function wireUploads() {
     [
       ["#front-image", "frontFile"],
       ["#left-image", "leftFile"],
       ["#right-image", "rightFile"],
     ].forEach(([inputSel, key]) => {
-      const input = $(inputSel);
-      const tile = input.closest(".upload-tile");
+      const gallery = $(inputSel);
+      if (!gallery) return;
+      const tile = gallery.closest(".upload-tile");
+      if (!tile) return;
+      const camera = tile.querySelector(".upload-input--camera");
       const removeBtn = tile.querySelector(".upload-remove");
+      const openBtn = tile.querySelector("[data-open-photo-source]");
 
-      input.addEventListener("change", () => {
+      const onFile = (input) => {
         if (state.photosLocked) {
           input.value = "";
           return;
         }
         const file = input.files?.[0] || null;
-        setUploadTileFile(tile, input, key, file);
-      });
+        if (file && input !== gallery) {
+          try {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            gallery.files = dt.files;
+          } catch (_) {
+            /* some browsers block assigning FileList; state still holds the File */
+          }
+        }
+        setUploadTileFile(tile, gallery, key, file);
+        closePhotoSourceSheet();
+      };
+
+      gallery.addEventListener("change", () => onFile(gallery));
+      if (camera) camera.addEventListener("change", () => onFile(camera));
+
+      if (openBtn) {
+        openBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openPhotoSourceSheet(tile);
+        });
+      }
 
       if (removeBtn) {
         removeBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
           if (state.photosLocked) return;
-          clearUploadTile(tile, input, key);
+          clearUploadTile(tile, gallery, key);
         });
-        // Keep label from opening the file picker when Remove is tapped.
-        removeBtn.addEventListener("mousedown", (e) => e.preventDefault());
-        removeBtn.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
       }
+    });
+
+    const sheet = $("#photo-source-sheet");
+    if (sheet) {
+      sheet.querySelectorAll("[data-photo-source-close]").forEach((el) => {
+        el.addEventListener("click", closePhotoSourceSheet);
+      });
+
+      sheet.querySelectorAll("[data-photo-source]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tile = pendingPhotoTile;
+          if (!tile || state.photosLocked) {
+            closePhotoSourceSheet();
+            return;
+          }
+          const source = btn.getAttribute("data-photo-source");
+          closePhotoSourceSheet();
+          if (source === "camera") {
+            requestAnimationFrame(() => openCameraCapture(tile));
+            return;
+          }
+          requestAnimationFrame(() => tile.querySelector(".upload-input--gallery")?.click());
+        });
+      });
+    }
+
+    $$("[data-camera-close]").forEach((el) => {
+      el.addEventListener("click", closeCameraCapture);
+    });
+    $("#camera-shutter")?.addEventListener("click", captureCameraPhoto);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!$("#camera-capture")?.hidden) {
+        closeCameraCapture();
+        return;
+      }
+      if (!$("#photo-source-sheet")?.hidden) closePhotoSourceSheet();
     });
   }
 
@@ -790,6 +1017,11 @@
   let heroSliderPaused = false;
   let heroRealCount = 0;
   let heroTrackJumping = false;
+  const heroMobileMq = window.matchMedia("(max-width: 520px)");
+
+  function isHeroSliderEnabled() {
+    return heroMobileMq.matches;
+  }
 
   function heroLogicalIndex(index = heroSlideIndex) {
     if (!heroRealCount) return 0;
@@ -823,6 +1055,13 @@
     const slides = $$(".hero-slide");
     if (!track || !slides.length || !heroRealCount) return;
 
+    if (!isHeroSliderEnabled()) {
+      heroSlideIndex = 0;
+      updateHeroSlideState(0);
+      track.style.transform = "none";
+      return;
+    }
+
     heroSlideIndex = Math.max(0, index);
     updateHeroSlideState(heroSlideIndex);
 
@@ -845,6 +1084,7 @@
   }
 
   function goHeroNext({ user = false } = {}) {
+    if (!isHeroSliderEnabled()) return;
     if (heroSlideIndex >= heroRealCount) {
       setHeroSlide(heroSlideIndex % heroRealCount, { instant: true });
     }
@@ -852,6 +1092,7 @@
   }
 
   function goHeroToLogical(logical, { user = false } = {}) {
+    if (!isHeroSliderEnabled()) return;
     const target = ((logical % heroRealCount) + heroRealCount) % heroRealCount;
     const current = heroLogicalIndex();
 
@@ -880,17 +1121,48 @@
   }
 
   function resumeHeroSlider() {
+    if (!isHeroSliderEnabled()) {
+      pauseHeroSlider();
+      const track = $("#hero-track");
+      heroSlideIndex = 0;
+      updateHeroSlideState(0);
+      if (track) track.style.transform = "none";
+      return;
+    }
     heroSliderPaused = false;
     restartHeroSlider();
   }
 
   function restartHeroSlider() {
     if (heroSlideTimer) clearInterval(heroSlideTimer);
+    if (!isHeroSliderEnabled()) return;
     if (heroSliderPaused) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     heroSlideTimer = setInterval(() => {
       goHeroNext();
     }, 5200);
+  }
+
+  function syncHeroSliderMode() {
+    const slider = $("#hero-landing");
+    const track = $("#hero-track");
+    if (!slider || !track) return;
+
+    if (isHeroSliderEnabled()) {
+      slider.classList.add("is-slider-active");
+      slider.setAttribute("aria-roledescription", "carousel");
+      setHeroSlide(0, { instant: true });
+      if (!$(".hero-shell")?.classList.contains("is-assessing")) {
+        resumeHeroSlider();
+      }
+    } else {
+      slider.classList.remove("is-slider-active");
+      slider.removeAttribute("aria-roledescription");
+      pauseHeroSlider();
+      heroSlideIndex = 0;
+      updateHeroSlideState(0);
+      track.style.transform = "none";
+    }
   }
 
   function initHeroSlider() {
@@ -914,6 +1186,7 @@
     }
 
     track.addEventListener("transitionend", (e) => {
+      if (!isHeroSliderEnabled()) return;
       if (e.target !== track || e.propertyName !== "transform") return;
       if (heroTrackJumping) return;
       if (heroSlideIndex >= heroRealCount) {
@@ -923,6 +1196,7 @@
 
     $$(".hero-dot").forEach((dot) => {
       dot.addEventListener("click", () => {
+        if (!isHeroSliderEnabled()) return;
         goHeroToLogical(Number(dot.dataset.slideTo) || 0, { user: true });
       });
     });
@@ -934,7 +1208,7 @@
     slider.addEventListener(
       "touchstart",
       (e) => {
-        if (!e.touches[0]) return;
+        if (!isHeroSliderEnabled() || !e.touches[0]) return;
         startX = e.touches[0].clientX;
         deltaX = 0;
         swiping = true;
@@ -946,14 +1220,17 @@
     slider.addEventListener(
       "touchmove",
       (e) => {
-        if (!swiping || !e.touches[0]) return;
+        if (!isHeroSliderEnabled() || !swiping || !e.touches[0]) return;
         deltaX = e.touches[0].clientX - startX;
       },
       { passive: true }
     );
 
     slider.addEventListener("touchend", () => {
-      if (!swiping) return;
+      if (!isHeroSliderEnabled() || !swiping) {
+        swiping = false;
+        return;
+      }
       swiping = false;
       if (Math.abs(deltaX) > 42) {
         // Always advance forward (1 → 2 → 1), never reverse-wrap.
@@ -963,8 +1240,14 @@
       }
     });
 
-    setHeroSlide(0, { instant: true });
-    resumeHeroSlider();
+    const onModeChange = () => syncHeroSliderMode();
+    if (typeof heroMobileMq.addEventListener === "function") {
+      heroMobileMq.addEventListener("change", onModeChange);
+    } else if (typeof heroMobileMq.addListener === "function") {
+      heroMobileMq.addListener(onModeChange);
+    }
+
+    syncHeroSliderMode();
   }
 
   function toLocalISODate(d) {
@@ -976,90 +1259,299 @@
 
   function formatBookTimeLabel(value) {
     if (!value) return "";
-    const [hRaw, mRaw] = value.split(":");
-    const h = Number(hRaw);
-    const m = Number(mRaw || 0);
-    if (Number.isNaN(h)) return value;
-    const suffix = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 || 12;
-    return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
+    const parsed = parseBookTime(value);
+    if (!parsed) return String(value).trim();
+    const { hours, minutes } = parsed;
+    const suffix = hours >= 12 ? "PM" : "AM";
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}`;
   }
 
-  function syncBookDateChips(iso) {
-    $$("#book-date-strip .book-date-chip").forEach((chip) => {
-      const on = chip.dataset.date === iso;
-      chip.classList.toggle("is-active", on);
-      chip.setAttribute("aria-selected", on ? "true" : "false");
-    });
-  }
-
-  function syncBookTimeChips(value) {
-    $$("#book-time-grid .book-time-slot").forEach((slot) => {
-      const on = slot.dataset.time === value;
-      slot.classList.toggle("is-active", on);
-      slot.setAttribute("aria-selected", on ? "true" : "false");
-    });
-  }
-
-  function buildBookDates(selectedIso) {
-    const strip = $("#book-date-strip");
-    const dateInput = $("#book-date");
-    if (!strip || !dateInput) return;
-
-    const days = [];
-    const cursor = new Date();
-    cursor.setHours(12, 0, 0, 0);
-    cursor.setDate(cursor.getDate() + 1);
-
-    while (days.length < 14) {
-      if (cursor.getDay() !== 0) {
-        days.push(new Date(cursor));
-      }
-      cursor.setDate(cursor.getDate() + 1);
+  /** Accepts "12:00 PM", "12:00PM", "14:30", "2:00 pm" → { hours, minutes } or null */
+  function parseBookTime(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return null;
+    const ampm = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (ampm) {
+      let hours = Number(ampm[1]);
+      const minutes = Number(ampm[2]);
+      const suffix = ampm[3].toUpperCase();
+      if (hours < 1 || hours > 12 || minutes > 59) return null;
+      if (suffix === "AM") hours = hours === 12 ? 0 : hours;
+      else hours = hours === 12 ? 12 : hours + 12;
+      return { hours, minutes };
     }
+    const h24 = text.match(/^(\d{1,2}):(\d{2})$/);
+    if (h24) {
+      const hours = Number(h24[1]);
+      const minutes = Number(h24[2]);
+      if (hours > 23 || minutes > 59) return null;
+      return { hours, minutes };
+    }
+    return null;
+  }
 
-    const minIso = toLocalISODate(days[0]);
-    dateInput.min = minIso;
+  function isBookTimeInClinicHours(parsed) {
+    if (!parsed) return false;
+    const total = parsed.hours * 60 + parsed.minutes;
+    return total >= 9 * 60 && total <= 20 * 60;
+  }
 
-    const preferred =
-      selectedIso && selectedIso >= minIso ? selectedIso : minIso;
+  const BOOK_DEFAULT_TIME = "12:00 PM";
 
-    strip.innerHTML = days
-      .map((d) => {
-        const iso = toLocalISODate(d);
-        const selected = iso === preferred;
-        return `
-          <button
-            type="button"
-            class="book-date-chip${selected ? " is-active" : ""}"
-            role="option"
-            data-date="${iso}"
-            aria-selected="${selected ? "true" : "false"}"
-          >
-            <span class="book-date-chip-dow">${d.toLocaleDateString(undefined, { weekday: "short" })}</span>
-            <span class="book-date-chip-day">${d.getDate()}</span>
-            <span class="book-date-chip-mon">${d.toLocaleDateString(undefined, { month: "short" })}</span>
-          </button>
-        `;
+
+  function formatBookDateLabel(iso) {
+    if (!iso) return "Select a date";
+    return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function bookMinDate() {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  function bookMaxDate() {
+    const d = bookMinDate();
+    return new Date(d.getFullYear() + 1, 11, 31, 12, 0, 0, 0);
+  }
+
+  function validateBookName(raw) {
+    const name = String(raw || "").trim().replace(/\s+/g, " ");
+    if (!name) return { ok: false, msg: "Full name is required." };
+    if (name.length < 3) return { ok: false, msg: "Name must be at least 3 characters." };
+    if (name.length > 60) return { ok: false, msg: "Name is too long (60 characters max)." };
+    if (/\d/.test(name)) return { ok: false, msg: "Name can’t include numbers." };
+    if (!/^[\p{L}][\p{L}\s'.-]*$/u.test(name)) {
+      return { ok: false, msg: "Use letters only (spaces, hyphen, apostrophe OK)." };
+    }
+    const parts = name.split(" ").filter(Boolean);
+    if (parts.length < 2) return { ok: false, msg: "Enter first and last name." };
+    if (parts.some((part) => part.replace(/[^\p{L}]/gu, "").length < 2)) {
+      return { ok: false, msg: "Each name part needs at least 2 letters." };
+    }
+    return { ok: true, msg: "" };
+  }
+
+  let bookCalMonth = null;
+
+  function closeBookPickers() {
+    const cal = $("#book-cal");
+    const dateTrigger = $("#book-date-trigger");
+    if (cal) cal.hidden = true;
+    if (dateTrigger) dateTrigger.setAttribute("aria-expanded", "false");
+  }
+
+  function syncBookCalSelectors() {
+    const monthSelect = $("#book-cal-month-select");
+    const yearSelect = $("#book-cal-year-select");
+    if (!bookCalMonth || !monthSelect || !yearSelect) return;
+
+    const min = bookMinDate();
+    const max = bookMaxDate();
+    const year = bookCalMonth.getFullYear();
+    const month = bookCalMonth.getMonth();
+
+    const months = Array.from({ length: 12 }, (_, i) =>
+      new Date(2020, i, 1).toLocaleDateString(undefined, { month: "short" })
+    );
+    monthSelect.innerHTML = months
+      .map((label, i) => {
+        const probe = new Date(year, i, 1);
+        const last = new Date(year, i + 1, 0);
+        const disabled = last < min || probe > max;
+        return `<option value="${i}" ${i === month ? "selected" : ""} ${disabled ? "disabled" : ""}>${label}</option>`;
       })
       .join("");
 
-    dateInput.value = preferred;
-    syncBookDateChips(preferred);
+    const years = [];
+    for (let y = min.getFullYear(); y <= max.getFullYear(); y += 1) years.push(y);
+    yearSelect.innerHTML = years
+      .map((y) => `<option value="${y}" ${y === year ? "selected" : ""}>${y}</option>`)
+      .join("");
+
+    const prev = $("#book-cal-prev");
+    const next = $("#book-cal-next");
+    if (prev) {
+      const earlier = new Date(year, month - 1, 1);
+      prev.disabled = new Date(earlier.getFullYear(), earlier.getMonth() + 1, 0) < min;
+    }
+    if (next) {
+      const later = new Date(year, month + 1, 1);
+      next.disabled = later > max;
+    }
+  }
+
+  function renderBookCalendar() {
+    const grid = $("#book-cal-grid");
+    const dateInput = $("#book-date");
+    if (!grid || !bookCalMonth) return;
+
+    syncBookCalSelectors();
+
+    const year = bookCalMonth.getFullYear();
+    const month = bookCalMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const startPad = first.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const minIso = toLocalISODate(bookMinDate());
+    const maxIso = toLocalISODate(bookMaxDate());
+    const selected = dateInput?.value || "";
+    const todayIso = toLocalISODate(new Date());
+
+    const cells = [];
+    for (let i = 0; i < startPad; i += 1) {
+      cells.push('<span class="book-cal-day is-empty"></span>');
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const iso = toLocalISODate(new Date(year, month, day));
+      const disabled =
+        iso < minIso || iso > maxIso || new Date(`${iso}T12:00:00`).getDay() === 0;
+      const classes = [
+        "book-cal-day",
+        selected === iso ? "is-selected" : "",
+        iso === todayIso ? "is-today" : "",
+        disabled ? "is-disabled" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      cells.push(
+        `<button type="button" class="${classes}" data-date="${iso}" ${disabled ? "disabled" : ""} aria-pressed="${selected === iso ? "true" : "false"}">${day}</button>`
+      );
+    }
+    grid.innerHTML = cells.join("");
   }
 
   function selectBookDate(iso) {
     const dateInput = $("#book-date");
+    const display = $("#book-date-display");
+    const trigger = $("#book-date-trigger");
     if (!dateInput || !iso) return;
     dateInput.value = iso;
-    syncBookDateChips(iso);
+    if (display) display.textContent = formatBookDateLabel(iso);
+    if (trigger) trigger.classList.add("has-value");
+    closeBookPickers();
+    updateBookSubmitEnabled(false);
   }
 
   function selectBookTime(value) {
     const timeInput = $("#book-time");
     if (!timeInput) return;
-    if (value) timeInput.value = value;
-    syncBookTimeChips(timeInput.value || "");
+    timeInput.value = value ? formatBookTimeLabel(value) : BOOK_DEFAULT_TIME;
+    updateBookSubmitEnabled(false);
+  }
+
+  function buildBookTimeMenu() { /* no-op — editable text time */ }
+
+  function updateBookSubmitEnabled(showErrors = false) {
+    const btn = $("#book-submit");
+    const nameInput = $("#book-name");
+    const emailInput = $("#book-email");
+    const phoneInput = $("#book-phone");
+    const dateInput = $("#book-date");
+    const timeInput = $("#book-time");
+    if (!btn || !nameInput || !emailInput || !phoneInput || !dateInput || !timeInput) return;
+
+    const name = nameInput.value.trim().replace(/\s+/g, " ");
+    const email = emailInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const date = dateInput.value;
+    const time = timeInput.value;
+    const phoneDigits = normalizePakistaniMobile(phone);
+    const nameCheck = validateBookName(name);
+
+    let nameMsg = "";
+    let emailMsg = "";
+    let phoneMsg = "";
+    let dateMsg = "";
+    let timeMsg = "";
+    let nameOk = false;
+    let emailOk = false;
+    let phoneOk = false;
+    let dateOk = false;
+    let timeOk = false;
+
+    if (!nameCheck.ok) {
+      nameMsg = showErrors || nameInput.dataset.touched === "1" ? nameCheck.msg : "";
+      if (name) nameInput.dataset.touched = "1";
+    } else {
+      nameOk = true;
+      if (nameInput.value !== name) nameInput.value = name;
+    }
+
+    if (!email) {
+      emailMsg = showErrors || emailInput.dataset.touched === "1" ? "Email is required." : "";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      emailMsg = "Enter a valid email, e.g. you@email.com.";
+      emailInput.dataset.touched = "1";
+    } else {
+      emailOk = true;
+    }
+
+    if (!phone) {
+      phoneMsg = showErrors || phoneInput.dataset.touched === "1" ? "Mobile number is required." : "";
+    } else if (!isValidPakistaniMobile(phone)) {
+      if (phoneDigits.length > 0 && !phoneDigits.startsWith("3")) {
+        phoneMsg = "Must start with 3.";
+      } else if (phoneDigits.length > 0 && phoneDigits.length < 10) {
+        phoneMsg = `Enter ${10 - phoneDigits.length} more digit${10 - phoneDigits.length === 1 ? "" : "s"} (10 total).`;
+      } else if (phoneDigits.length > 10) {
+        phoneMsg = "Use 10 digits after +92, e.g. 3XX XXXXXXX.";
+      } else {
+        phoneMsg = "Enter a valid number, e.g. 300 1234567.";
+      }
+      phoneInput.dataset.touched = "1";
+    } else {
+      phoneOk = true;
+    }
+
+    if (!date) {
+      dateMsg = showErrors || dateInput.dataset.touched === "1" ? "Please choose a date." : "";
+    } else {
+      dateOk = true;
+    }
+
+    if (!time) {
+      timeMsg = showErrors || timeInput.dataset.touched === "1" ? "Please choose a time." : "";
+    } else {
+      const parsed = parseBookTime(time);
+      if (!parsed) {
+        timeMsg = "Use a time like 12:00 PM.";
+        timeInput.dataset.touched = "1";
+      } else if (!isBookTimeInClinicHours(parsed)) {
+        timeMsg = "Choose a time between 9:00 AM and 8:00 PM.";
+        timeInput.dataset.touched = "1";
+      } else {
+        timeOk = true;
+        const normalized = formatBookTimeLabel(time);
+        if (timeInput.value !== normalized && document.activeElement !== timeInput) {
+          timeInput.value = normalized;
+        }
+      }
+    }
+
+    setFieldFeedback("#book-name-feedback", nameMsg, nameOk);
+    setFieldFeedback("#book-email-feedback", emailMsg, emailOk);
+    setFieldFeedback("#book-phone-feedback", phoneMsg, phoneOk);
+    setFieldFeedback("#book-date-feedback", dateMsg, dateOk);
+    setFieldFeedback("#book-time-feedback", timeMsg, timeOk);
+
+    nameInput.classList.toggle("is-invalid", !!nameMsg);
+    emailInput.classList.toggle("is-invalid", !!emailMsg);
+    phoneInput.classList.toggle("is-invalid", !!phoneMsg);
+    nameInput.closest(".field")?.classList.toggle("is-invalid", !!nameMsg);
+    emailInput.closest(".field")?.classList.toggle("is-invalid", !!emailMsg);
+    phoneInput.closest(".field")?.classList.toggle("is-invalid", !!phoneMsg);
+    $("#book-date-trigger")?.classList.toggle("is-invalid", !!dateMsg);
+    $("#book-time")?.classList.toggle("is-invalid", !!timeMsg);
+
+    btn.disabled = !(nameOk && emailOk && phoneOk && dateOk && timeOk);
   }
 
   function openBookModal() {
@@ -1072,19 +1564,38 @@
     if (form) form.hidden = false;
     if (success) success.hidden = true;
     if (status) setStatus(status, "");
+    closeBookPickers();
 
     const email = $("#book-email");
     const phone = $("#book-phone");
-    const timeInput = $("#book-time");
     if (email && state.email) email.value = state.email;
     if (phone && state.phone) {
       const digits = state.phone.replace(/\D/g, "");
       phone.value = digits.startsWith("92") ? digits.slice(2) : digits.replace(/^0/, "");
     }
 
-    buildBookDates($("#book-date")?.value || "");
-    if (timeInput && !timeInput.value) timeInput.value = "10:00";
-    selectBookTime(timeInput?.value || "10:00");
+    const min = bookMinDate();
+    bookCalMonth = new Date(min.getFullYear(), min.getMonth(), 1);
+    const dateInput = $("#book-date");
+    const timeInput = $("#book-time");
+    if (dateInput && !dateInput.value) {
+      // leave empty until user picks — required for disabled submit
+      dateInput.value = "";
+      $("#book-date-display").textContent = "Select a date";
+      $("#book-date-trigger")?.classList.remove("has-value");
+    } else if (dateInput?.value) {
+      $("#book-date-display").textContent = formatBookDateLabel(dateInput.value);
+      $("#book-date-trigger")?.classList.add("has-value");
+      const selected = new Date(`${dateInput.value}T12:00:00`);
+      bookCalMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    }
+    if (timeInput) {
+      timeInput.value = BOOK_DEFAULT_TIME;
+      timeInput.dataset.touched = "";
+    }
+
+    renderBookCalendar();
+    updateBookSubmitEnabled(false);
 
     modal.hidden = false;
     document.body.classList.add("book-open");
@@ -1094,6 +1605,7 @@
   function closeBookModal() {
     const modal = $("#book-modal");
     if (!modal) return;
+    closeBookPickers();
     modal.hidden = true;
     document.body.classList.remove("book-open");
   }
@@ -1106,31 +1618,120 @@
     });
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !$("#book-modal")?.hidden) closeBookModal();
+      if (e.key === "Escape" && !$("#book-modal")?.hidden) {
+        if (!$("#book-cal")?.hidden) {
+          closeBookPickers();
+          return;
+        }
+        closeBookModal();
+      }
     });
 
-    $("#book-date")?.addEventListener("change", (e) => {
-      syncBookDateChips(e.target.value);
+    ["#book-name", "#book-email", "#book-phone"].forEach((sel) => {
+      const el = $(sel);
+      if (!el) return;
+      el.addEventListener("input", () => updateBookSubmitEnabled(false));
+      el.addEventListener("blur", () => {
+        el.dataset.touched = "1";
+        updateBookSubmitEnabled(false);
+      });
     });
 
-    $("#book-time")?.addEventListener("input", (e) => {
-      syncBookTimeChips(e.target.value);
+    const bookPhone = $("#book-phone");
+    if (bookPhone) {
+      bookPhone.addEventListener("input", () => {
+        const cleaned = bookPhone.value.replace(/[^\d\s]/g, "");
+        if (cleaned !== bookPhone.value) bookPhone.value = cleaned;
+      });
+    }
+
+    $("#book-date-trigger")?.addEventListener("click", () => {
+      const cal = $("#book-cal");
+      const trigger = $("#book-date-trigger");
+      if (!cal || !trigger) return;
+      const open = cal.hidden;
+      cal.hidden = !open;
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        $("#book-date").dataset.touched = "1";
+        renderBookCalendar();
+      }
     });
 
-    $("#book-date-strip")?.addEventListener("click", (e) => {
-      const chip = e.target.closest(".book-date-chip");
-      if (!chip) return;
-      selectBookDate(chip.dataset.date);
+    $("#book-time")?.addEventListener("input", () => {
+      $("#book-time").dataset.touched = "1";
+      updateBookSubmitEnabled(false);
+    });
+    $("#book-time")?.addEventListener("blur", () => {
+      const el = $("#book-time");
+      if (!el) return;
+      const parsed = parseBookTime(el.value);
+      if (parsed) el.value = formatBookTimeLabel(el.value);
+      updateBookSubmitEnabled(false);
+    });
+    $("#book-time")?.addEventListener("change", () => {
+      updateBookSubmitEnabled(false);
     });
 
-    $("#book-time-grid")?.addEventListener("click", (e) => {
-      const slot = e.target.closest(".book-time-slot");
-      if (!slot) return;
-      selectBookTime(slot.dataset.time);
+    $("#book-cal-prev")?.addEventListener("click", () => {
+      if (!bookCalMonth) return;
+      bookCalMonth = new Date(bookCalMonth.getFullYear(), bookCalMonth.getMonth() - 1, 1);
+      const min = bookMinDate();
+      if (new Date(bookCalMonth.getFullYear(), bookCalMonth.getMonth() + 1, 0) < min) {
+        bookCalMonth = new Date(min.getFullYear(), min.getMonth(), 1);
+      }
+      renderBookCalendar();
+    });
+
+    $("#book-cal-next")?.addEventListener("click", () => {
+      if (!bookCalMonth) return;
+      bookCalMonth = new Date(bookCalMonth.getFullYear(), bookCalMonth.getMonth() + 1, 1);
+      const max = bookMaxDate();
+      if (bookCalMonth > max) {
+        bookCalMonth = new Date(max.getFullYear(), max.getMonth(), 1);
+      }
+      renderBookCalendar();
+    });
+
+    $("#book-cal-month-select")?.addEventListener("change", (e) => {
+      if (!bookCalMonth) return;
+      const month = Number(e.target.value);
+      bookCalMonth = new Date(bookCalMonth.getFullYear(), month, 1);
+      renderBookCalendar();
+    });
+
+    $("#book-cal-year-select")?.addEventListener("change", (e) => {
+      if (!bookCalMonth) return;
+      const year = Number(e.target.value);
+      bookCalMonth = new Date(year, bookCalMonth.getMonth(), 1);
+      const min = bookMinDate();
+      const max = bookMaxDate();
+      if (new Date(year, bookCalMonth.getMonth() + 1, 0) < min) {
+        bookCalMonth = new Date(min.getFullYear(), min.getMonth(), 1);
+      } else if (bookCalMonth > max) {
+        bookCalMonth = new Date(max.getFullYear(), max.getMonth(), 1);
+      }
+      renderBookCalendar();
+    });
+
+    $("#book-cal-grid")?.addEventListener("click", (e) => {
+      const day = e.target.closest(".book-cal-day:not(.is-disabled):not(.is-empty)");
+      if (!day) return;
+      selectBookDate(day.dataset.date);
+    });
+
+
+
+
+    document.addEventListener("click", (e) => {
+      if ($("#book-modal")?.hidden) return;
+      if (e.target.closest(".book-picker-field")) return;
+      closeBookPickers();
     });
 
     $("#book-form")?.addEventListener("submit", (e) => {
       e.preventDefault();
+      updateBookSubmitEnabled(true);
       const name = $("#book-name")?.value.trim() || "";
       const email = $("#book-email")?.value.trim() || "";
       const phoneRaw = $("#book-phone")?.value.trim() || "";
@@ -1139,23 +1740,14 @@
       const note = $("#book-note")?.value.trim() || "";
       const status = $("#book-status");
 
-      if (!name || !email || !date || !time) {
+      if ($("#book-submit")?.disabled) {
         setStatus(status, "Please complete all required fields.", true);
-        return;
-      }
-      if (!isValidPakistaniMobile(phoneRaw)) {
-        setStatus(status, "Enter a valid Pakistani mobile number.", true);
         return;
       }
 
       const phone = formatPakistaniPhone(phoneRaw);
       const timeLabel = formatBookTimeLabel(time);
-      const dateLabel = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
+      const dateLabel = formatBookDateLabel(date);
 
       const subject = encodeURIComponent("Virtual Smile Assessment booking");
       const body = encodeURIComponent(

@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=booking2" />
-  <link rel="stylesheet" href="/static/mobile.css?v=booking2" />
+  <link rel="stylesheet" href="/static/styles.css?v=booking11" />
+  <link rel="stylesheet" href="/static/mobile.css?v=booking11" />
 </head>
 <body>
   <main id="top">
@@ -73,15 +73,17 @@
               </div>
 
               <div class="hero-patient">
-                <div class="stat-badge">
-                  <strong>98%</strong>
-                  <span>loyal dental patients.</span>
+                <div class="patient-cluster">
+                  <div class="stat-badge">
+                    <strong>98%</strong>
+                    <span>loyal dental patients.</span>
+                  </div>
+                  <img
+                    class="hero-woman"
+                    src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
+                    alt="Happy patient celebrating her smile"
+                  />
                 </div>
-                <img
-                  class="hero-woman"
-                  src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
-                  alt="Happy patient celebrating her smile"
-                />
               </div>
             </article>
 
@@ -103,22 +105,19 @@
               </div>
 
               <div class="hero-patient implants-patient">
-                <div class="stat-badge implants-stat">
-                  <strong>98%</strong>
-                  <span>patients took the assessment.</span>
+                <div class="patient-cluster patient-cluster--implants">
+                  <div class="stat-badge implants-stat">
+                    <strong>98%</strong>
+                    <span>patients took the assessment.</span>
+                  </div>
+                  <img
+                    class="hero-woman hero-woman--implants"
+                    src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
+                    alt="Happy patient celebrating her smile"
+                  />
                 </div>
-                <img
-                  class="hero-woman hero-woman--implants"
-                  src="/static/assets/hero-woman-v2-removebg-preview.png?v=1"
-                  alt="Happy patient celebrating her smile"
-                />
               </div>
             </article>
-          </div>
-
-          <div class="hero-dots" role="tablist" aria-label="Hero slides">
-            <button type="button" class="hero-dot is-active" data-slide-to="0" aria-label="Assess Your Smile" aria-selected="true"></button>
-            <button type="button" class="hero-dot" data-slide-to="1" aria-label="AI Smile Analysis" aria-selected="false"></button>
           </div>
         </div>
 
@@ -189,8 +188,9 @@
                   <span class="upload-title">Front smile <em class="upload-badge">Required</em></span>
                   <span class="upload-hint">Face the camera directly</span>
                 </div>
-                <label class="upload-drop">
-                  <input type="file" id="front-image" accept="image/*" required />
+                <div class="upload-drop">
+                  <input type="file" id="front-image" class="upload-input upload-input--gallery" accept="image/*" required hidden />
+                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="user" hidden aria-hidden="true" />
                   <div class="upload-media">
                     <span class="upload-example" aria-hidden="true">
                       <img src="/static/assets/example-front.png" alt="" />
@@ -198,21 +198,22 @@
                     </span>
                     <img class="upload-preview" alt="Your front smile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">
+                    <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add front smile photo">
                       <span class="upload-add-icon" aria-hidden="true">+</span>
                       <span class="upload-add-text">Tap to add front smile</span>
-                    </span>
+                    </button>
                     <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
-                </label>
+                </div>
               </div>
               <div class="upload-tile" data-upload="left">
                 <div class="upload-meta">
                   <span class="upload-title">Left</span>
                   <span class="upload-hint">Optional</span>
                 </div>
-                <label class="upload-drop">
-                  <input type="file" id="left-image" accept="image/*" />
+                <div class="upload-drop">
+                  <input type="file" id="left-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
+                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="environment" hidden aria-hidden="true" />
                   <div class="upload-media">
                     <span class="upload-example" aria-hidden="true">
                       <img src="/static/assets/example-left.png" alt="" />
@@ -220,21 +221,22 @@
                     </span>
                     <img class="upload-preview" alt="Your left profile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">
+                    <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add left photo">
                       <span class="upload-add-icon" aria-hidden="true">+</span>
                       <span class="upload-add-text">Add photo</span>
-                    </span>
+                    </button>
                     <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
-                </label>
+                </div>
               </div>
               <div class="upload-tile" data-upload="right">
                 <div class="upload-meta">
                   <span class="upload-title">Right</span>
                   <span class="upload-hint">Optional</span>
                 </div>
-                <label class="upload-drop">
-                  <input type="file" id="right-image" accept="image/*" />
+                <div class="upload-drop">
+                  <input type="file" id="right-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
+                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="environment" hidden aria-hidden="true" />
                   <div class="upload-media">
                     <span class="upload-example" aria-hidden="true">
                       <img src="/static/assets/example-right.png" alt="" />
@@ -242,13 +244,13 @@
                     </span>
                     <img class="upload-preview" alt="Your right profile photo" hidden />
                     <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <span class="upload-add-overlay">
+                    <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add right photo">
                       <span class="upload-add-icon" aria-hidden="true">+</span>
                       <span class="upload-add-text">Add photo</span>
-                    </span>
+                    </button>
                     <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
-                </label>
+                </div>
               </div>
             </div>
 
@@ -431,10 +433,12 @@
         <label class="field" for="book-name">
           <span class="field-label">Full name</span>
           <input type="text" id="book-name" name="name" required placeholder="Your name" autocomplete="name" />
+          <span class="field-feedback" id="book-name-feedback" aria-live="polite"></span>
         </label>
         <label class="field" for="book-email">
           <span class="field-label">Email</span>
           <input type="email" id="book-email" name="email" required placeholder="you@email.com" autocomplete="email" />
+          <span class="field-feedback" id="book-email-feedback" aria-live="polite"></span>
         </label>
         <label class="field" for="book-phone">
           <span class="field-label">Mobile number</span>
@@ -442,37 +446,67 @@
             <span class="phone-prefix" aria-hidden="true">+92</span>
             <input type="tel" id="book-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
           </span>
+          <span class="field-feedback" id="book-phone-feedback" aria-live="polite"></span>
         </label>
         <div class="book-schedule">
-          <div class="field">
-            <label class="field-label" for="book-date">Preferred date</label>
-            <input type="date" id="book-date" name="date" required />
-            <div
-              class="book-date-strip"
-              id="book-date-strip"
-              role="listbox"
-              aria-label="Quick date picks"
-            ></div>
+          <div class="field book-picker-field">
+            <span class="field-label" id="book-date-label-text">Preferred date</span>
+            <input type="hidden" id="book-date" name="date" required />
+            <button
+              type="button"
+              class="book-picker-trigger"
+              id="book-date-trigger"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="book-cal"
+              aria-labelledby="book-date-label-text"
+            >
+              <span class="book-picker-value" id="book-date-display">Select a date</span>
+              <span class="book-picker-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="5" width="18" height="16" rx="3" />
+                  <path d="M3 10h18M8 3v4M16 3v4" />
+                </svg>
+              </span>
+            </button>
+            <div class="book-cal" id="book-cal" hidden role="dialog" aria-label="Choose a date">
+              <div class="book-cal-head">
+                <button type="button" class="book-cal-nav" id="book-cal-prev" aria-label="Previous month">‹</button>
+                <div class="book-cal-selectors" role="group" aria-label="Month and year">
+                  <label class="book-cal-select-wrap book-cal-select-wrap--month" for="book-cal-month-select">
+                    <span class="visually-hidden">Month</span>
+                    <select id="book-cal-month-select" class="book-cal-select" aria-label="Month"></select>
+                  </label>
+                  <span class="book-cal-select-divider" aria-hidden="true"></span>
+                  <label class="book-cal-select-wrap book-cal-select-wrap--year" for="book-cal-year-select">
+                    <span class="visually-hidden">Year</span>
+                    <select id="book-cal-year-select" class="book-cal-select" aria-label="Year"></select>
+                  </label>
+                </div>
+                <button type="button" class="book-cal-nav" id="book-cal-next" aria-label="Next month">›</button>
+              </div>
+              <div class="book-cal-dows" aria-hidden="true">
+                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+              </div>
+              <div class="book-cal-grid" id="book-cal-grid"></div>
+            </div>
+            <span class="field-feedback" id="book-date-feedback" aria-live="polite"></span>
           </div>
           <div class="field">
             <label class="field-label" for="book-time">Preferred time</label>
-            <input type="time" id="book-time" name="time" required step="900" min="09:00" max="20:00" />
-            <p class="book-hint">Clinic hours 9:00 AM – 8:00 PM. Pick any time, or use a quick slot.</p>
-            <div
-              class="book-time-grid"
-              id="book-time-grid"
-              role="listbox"
-              aria-label="Quick time picks"
-            >
-              <button type="button" class="book-time-slot" data-time="10:00">10:00 AM</button>
-              <button type="button" class="book-time-slot" data-time="11:00">11:00 AM</button>
-              <button type="button" class="book-time-slot" data-time="12:00">12:00 PM</button>
-              <button type="button" class="book-time-slot" data-time="14:00">2:00 PM</button>
-              <button type="button" class="book-time-slot" data-time="15:00">3:00 PM</button>
-              <button type="button" class="book-time-slot" data-time="16:00">4:00 PM</button>
-              <button type="button" class="book-time-slot" data-time="17:00">5:00 PM</button>
-              <button type="button" class="book-time-slot" data-time="18:00">6:00 PM</button>
-            </div>
+            <input
+              type="text"
+              id="book-time"
+              name="time"
+              required
+              value="12:00 PM"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="12:00 PM"
+              aria-describedby="book-time-hint"
+            />
+            <span class="book-time-hint" id="book-time-hint">Clinic hours 9:00 AM – 8:00 PM</span>
+            <span class="field-feedback" id="book-time-feedback" aria-live="polite"></span>
           </div>
         </div>
         <label class="field" for="book-note">
@@ -480,7 +514,7 @@
           <textarea id="book-note" name="note" rows="2" placeholder="Anything we should know before your visit?"></textarea>
         </label>
         <p id="book-status" class="status" role="status"></p>
-        <button type="submit" class="btn btn-primary" id="book-submit">Request appointment</button>
+        <button type="submit" class="btn btn-primary" id="book-submit" disabled>Request appointment</button>
       </form>
 
       <div class="book-success" id="book-success" hidden>
@@ -491,11 +525,50 @@
     </div>
   </div>
 
+  <div class="photo-source-sheet" id="photo-source-sheet" hidden>
+    <div class="photo-source-backdrop" data-photo-source-close></div>
+    <div class="photo-source-panel" role="dialog" aria-modal="true" aria-labelledby="photo-source-title">
+      <h3 id="photo-source-title">Add photo</h3>
+      <p class="photo-source-lead">Choose how you’d like to add this smile photo.</p>
+      <button type="button" class="photo-source-option" data-photo-source="camera">
+        <span class="photo-source-option-title">Take photo</span>
+        <span class="photo-source-option-sub">Open your camera</span>
+      </button>
+      <button type="button" class="photo-source-option" data-photo-source="gallery">
+        <span class="photo-source-option-title">Upload from library</span>
+        <span class="photo-source-option-sub">Choose an existing photo</span>
+      </button>
+      <button type="button" class="photo-source-cancel" data-photo-source-close>Cancel</button>
+    </div>
+  </div>
+
+  <div class="camera-capture" id="camera-capture" hidden>
+    <div class="camera-capture-backdrop" data-camera-close></div>
+    <div class="camera-capture-panel" role="dialog" aria-modal="true" aria-labelledby="camera-capture-title">
+      <div class="camera-capture-head">
+        <div>
+          <h3 id="camera-capture-title">Take photo</h3>
+          <p id="camera-capture-hint">Center your smile, then capture.</p>
+        </div>
+        <button type="button" class="camera-capture-close" data-camera-close aria-label="Close camera">×</button>
+      </div>
+      <div class="camera-capture-stage">
+        <video id="camera-video" playsinline autoplay muted></video>
+        <canvas id="camera-canvas" hidden></canvas>
+        <p id="camera-status" class="camera-status" role="status"></p>
+      </div>
+      <div class="camera-capture-actions">
+        <button type="button" class="btn btn-ghost" data-camera-close>Cancel</button>
+        <button type="button" class="btn btn-primary" id="camera-shutter" disabled>Capture</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="site-footer" id="site-footer" hidden>
     <img src="/static/assets/logo.png?v=6" alt="The Global Dentist" width="48" height="48" />
     <p>© The Global Dentist · Virtual Smile Assessment · Preliminary AI tool only - not a diagnosis</p>
   </footer>
 
-  <script src="/static/app.js?v=booking2"></script>
+  <script src="/static/app.js?v=booking11"></script>
 </body>
 </html>
