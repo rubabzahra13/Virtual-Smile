@@ -2,6 +2,7 @@
   const state = {
     email: "",
     phone: "",
+    assessmentId: null,
     frontFile: null,
     leftFile: null,
     rightFile: null,
@@ -51,7 +52,37 @@
     if (!show) closeChatPanel();
   }
 
+  function resetAssessScroll() {
+    const root = document.documentElement;
+    const body = document.body;
+    const assess = $("#assess");
+    const touched = [root, body, assess].filter(Boolean);
+    $$(".hero-assess .panel").forEach((panel) => touched.push(panel));
+    const shell = document.querySelector(".hero-shell.is-assessing");
+    if (shell) touched.push(shell);
+    const card = document.querySelector(".hero-shell.is-assessing .hero-card");
+    if (card) touched.push(card);
+
+    const prev = touched.map((el) => el.style.scrollBehavior);
+    touched.forEach((el) => {
+      el.style.scrollBehavior = "auto";
+    });
+
+    window.scrollTo(0, 0);
+    root.scrollTop = 0;
+    body.scrollTop = 0;
+    touched.forEach((el) => {
+      el.scrollTop = 0;
+    });
+
+    touched.forEach((el, i) => {
+      el.style.scrollBehavior = prev[i] || "";
+    });
+  }
+
   function showStep(step) {
+    // Zero scroll before revealing the next panel so we never land mid-page.
+    resetAssessScroll();
     $$(".flow-tab").forEach((tab) => {
       const n = Number(tab.dataset.step);
       tab.classList.toggle("is-active", n === step);
@@ -62,8 +93,10 @@
       const active = Number(panel.dataset.panel) === step;
       panel.hidden = !active;
       panel.classList.toggle("is-active", active);
+      if (active) panel.scrollTop = 0;
     });
     setChatFloatVisible(step === 3);
+    resetAssessScroll();
   }
 
   function setPhotosLocked(locked) {
@@ -687,14 +720,129 @@
     updateChatLimitUI();
   }
 
-  $("#details-form").addEventListener("submit", (e) => {
+  const ALREADY_ASSESSED_MSG =
+    "You have already taken an assessment. Please use a different email or mobile number, or contact the clinic.";
+
+  let eligibilityBlock = null; // { field: 'email'|'phone', reason: string }
+
+  function clearEligibilityBlock() {
+    eligibilityBlock = null;
+    const status = $("#details-status");
+    if (status) setStatus(status, "");
+  }
+
+  function applyEligibilityBlock(field, reason) {
+    const friendly =
+      reason ||
+      (field === "phone"
+        ? "You have already taken an assessment with this mobile number."
+        : "You have already taken an assessment with this email.");
+    eligibilityBlock = { field: field === "phone" ? "phone" : "email", reason: friendly };
+    const status = $("#details-status");
+    if (status) setStatus(status, ALREADY_ASSESSED_MSG, true);
+  }
+
+  function looksLikeAlreadyAssessed(text) {
+    return /already taken an assessment/i.test(String(text || ""));
+  }
+
+  async function fetchEligibility(email, phone) {
+    const url = `/api/eligibility?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`;
+    let lastFailure = null;
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const res = await fetch(url);
+        const raw = await res.text();
+        let data = {};
+        try {
+          data = raw ? JSON.parse(raw) : {};
+        } catch (_parseErr) {
+          data = {};
+        }
+
+        if (data && data.ok === false) {
+          return { status: "blocked", data };
+        }
+
+        const detail = typeof data.detail === "string" ? data.detail : "";
+        if (looksLikeAlreadyAssessed(detail)) {
+          return {
+            status: "blocked",
+            data: {
+              ok: false,
+              field: /mobile|phone/i.test(detail) ? "phone" : "email",
+              reason: detail,
+            },
+          };
+        }
+
+        if (res.ok) {
+          return { status: "ok", data };
+        }
+
+        lastFailure = {
+          status: "error",
+          message: detail || "Could not verify your details. Please try again.",
+          httpStatus: res.status,
+        };
+      } catch (_err) {
+        lastFailure = {
+          status: "error",
+          message: "Could not verify your details. Please try again.",
+        };
+      }
+
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
+    }
+
+    return lastFailure || {
+      status: "error",
+      message: "Could not verify your details. Please try again.",
+    };
+  }
+
+  $("#details-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    clearEligibilityBlock();
     updateContinueEnabled(true);
     const btn = $("#continue-to-photos");
     if (btn?.disabled) return;
-    state.email = $("#user-email").value.trim();
-    state.phone = formatPakistaniPhone($("#user-phone").value);
-    showStep(2);
+
+    const email = $("#user-email").value.trim();
+    const phone = formatPakistaniPhone($("#user-phone").value);
+    btn.disabled = true;
+    const prevLabel = btn.textContent;
+    btn.textContent = "Checking…";
+    try {
+      const result = await fetchEligibility(email, phone);
+      if (result.status === "blocked") {
+        applyEligibilityBlock(result.data?.field, result.data?.reason);
+        btn.textContent = prevLabel;
+        updateContinueEnabled(true);
+        return;
+      }
+      if (result.status === "error") {
+        const status = $("#details-status");
+        if (status) setStatus(status, result.message || ALREADY_ASSESSED_MSG, true);
+        btn.textContent = prevLabel;
+        updateContinueEnabled(true);
+        return;
+      }
+      state.email = email;
+      state.phone = phone;
+      btn.textContent = prevLabel;
+      showStep(2);
+    } catch (_err) {
+      const status = $("#details-status");
+      if (status) {
+        setStatus(status, "Could not verify your details. Please try again.", true);
+      }
+      btn.textContent = prevLabel;
+      updateContinueEnabled(true);
+    }
   });
 
   function setFieldFeedback(id, message, ok) {
@@ -778,8 +926,17 @@
           : "";
     }
 
-    setFieldFeedback("#email-feedback", emailMsg, emailOk);
-    setFieldFeedback("#phone-feedback", phoneMsg, phoneOk);
+    if (eligibilityBlock?.field === "email" && emailOk) {
+      emailMsg = eligibilityBlock.reason;
+      emailOk = false;
+    }
+    if (eligibilityBlock?.field === "phone" && phoneOk) {
+      phoneMsg = eligibilityBlock.reason;
+      phoneOk = false;
+    }
+
+    setFieldFeedback("#email-feedback", emailMsg, emailOk && !emailMsg);
+    setFieldFeedback("#phone-feedback", phoneMsg, phoneOk && !phoneMsg);
     setFieldFeedback("#consent-feedback", consentMsg, consent);
 
     emailInput.classList.toggle("is-invalid", !!emailMsg);
@@ -794,7 +951,10 @@
   ["#user-email", "#user-phone"].forEach((sel) => {
     const el = $(sel);
     if (!el) return;
-    el.addEventListener("input", () => updateContinueEnabled(false));
+    el.addEventListener("input", () => {
+      clearEligibilityBlock();
+      updateContinueEnabled(false);
+    });
     el.addEventListener("blur", () => {
       el.dataset.touched = "1";
       updateContinueEnabled(false);
@@ -843,13 +1003,18 @@
 
     try {
       const res = await fetch("/analyze", { method: "POST", body: formData });
-      const data = await res.json();
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_e) {
+        data = {};
+      }
       if (!res.ok) {
         const detail = data.detail;
-        const msg =
-          typeof detail === "string"
-            ? detail
-            : detail?.message || JSON.stringify(detail);
+        const msg = typeof detail === "string"
+          ? detail
+          : detail?.message || (raw && raw.trim() ? raw.trim() : "Server error during analysis.");
         throw new Error(msg);
       }
 
@@ -859,6 +1024,7 @@
       state.rawOutput = data.raw_model_output || "";
       state.simulationAllowed = data.simulation_allowed !== false;
       state.categoryScores = extractCategoryScores(data, state.reportText);
+      state.assessmentId = data.assessment_id || null;
 
       const summaryEl = $("#results-summary");
       if (summaryEl) {
@@ -1182,7 +1348,7 @@
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     heroSlideTimer = setInterval(() => {
       goHeroNext();
-    }, 5200);
+    }, 3400);
   }
 
   function syncHeroSliderMode() {
@@ -1333,14 +1499,43 @@
     return null;
   }
 
-  function isBookTimeInClinicHours(parsed) {
-    if (!parsed) return false;
-    const total = parsed.hours * 60 + parsed.minutes;
-    return total >= 9 * 60 && total <= 20 * 60;
+  function toHhmm(raw) {
+    const parsed = parseBookTime(raw);
+    if (!parsed) return "";
+    return `${String(parsed.hours).padStart(2, "0")}:${String(parsed.minutes).padStart(2, "0")}`;
   }
 
-  const BOOK_DEFAULT_TIME = "12:00 PM";
+  function resetBookTimeSelect(placeholder) {
+    const timeInput = $("#book-time");
+    if (!timeInput) return;
+    timeInput.innerHTML = `<option value="">${placeholder || "Select a date first"}</option>`;
+    timeInput.value = "";
+    timeInput.disabled = true;
+    timeInput.dataset.touched = "";
+  }
 
+  function fillBookTimeSelect(slots, preferred) {
+    const timeInput = $("#book-time");
+    if (!timeInput) return;
+    if (!slots.length) {
+      timeInput.innerHTML = `<option value="">No open times</option>`;
+      timeInput.value = "";
+      timeInput.disabled = true;
+      return;
+    }
+    const preferredHhmm = toHhmm(preferred) || preferred;
+    const selected = slots.includes(preferredHhmm) ? preferredHhmm : slots[0];
+    timeInput.innerHTML =
+      `<option value="">Select a time</option>` +
+      slots
+        .map(
+          (slot) =>
+            `<option value="${slot}" ${slot === selected ? "selected" : ""}>${formatBookTimeLabel(slot)}</option>`
+        )
+        .join("");
+    timeInput.disabled = false;
+    timeInput.value = selected;
+  }
 
   function formatBookDateLabel(iso) {
     if (!iso) return "Select a date";
@@ -1382,12 +1577,112 @@
   }
 
   let bookCalMonth = null;
+  let bookMonthMeta = {}; // iso -> { closed, full, free_count }
+  let bookFreeSlots = []; // HH:MM for selected date
+  let bookSubmitting = false;
+  let existingBooking = null;
+
+  function formatBookingSummary(booking) {
+    if (!booking) return "";
+    const day = formatBookDateLabel(booking.date);
+    const time = formatBookTimeLabel(String(booking.time || "").slice(0, 5));
+    return `${day} at ${time}`;
+  }
+
+  function showAlreadyBookedState(booking) {
+    const form = $("#book-form");
+    const success = $("#book-success");
+    const copy = $("#book-success-copy");
+    const status = $("#book-status");
+    if (form) form.hidden = true;
+    if (success) success.hidden = false;
+    if (copy) {
+      copy.textContent = `You already have an appointment for ${formatBookingSummary(booking)}. Contact the clinic if you need to change it.`;
+    }
+    if (status) setStatus(status, "");
+  }
+
+  async function fetchExistingBooking() {
+    const email = state.email || "";
+    const phone = state.phone || "";
+    if (!email && !phone) return null;
+    try {
+      const res = await fetch(
+        `/api/bookings/mine?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return null;
+      if (data.booked && data.booking) return data.booking;
+    } catch (_e) {
+      /* ignore and allow booking form */
+    }
+    return null;
+  }
 
   function closeBookPickers() {
     const cal = $("#book-cal");
     const dateTrigger = $("#book-date-trigger");
     if (cal) cal.hidden = true;
     if (dateTrigger) dateTrigger.setAttribute("aria-expanded", "false");
+  }
+
+  async function loadBookMonthMeta() {
+    if (!bookCalMonth) return;
+    const year = bookCalMonth.getFullYear();
+    const month = bookCalMonth.getMonth() + 1;
+    try {
+      const res = await fetch(`/api/availability/month?year=${year}&month=${month}`);
+      if (!res.ok) {
+        bookMonthMeta = {};
+        return;
+      }
+      const data = await res.json();
+      bookMonthMeta = data.days || {};
+    } catch (_e) {
+      bookMonthMeta = {};
+    }
+  }
+
+  async function loadBookFreeSlots(iso) {
+    bookFreeSlots = [];
+    const hint = $("#book-time-hint");
+    const previous = $("#book-time")?.value || "";
+    if (!iso) {
+      resetBookTimeSelect("Select a date first");
+      if (hint) hint.textContent = "Clinic hours are set by the practice.";
+      return;
+    }
+    try {
+      const res = await fetch(`/api/availability?date=${encodeURIComponent(iso)}`);
+      if (!res.ok) {
+        resetBookTimeSelect("Could not load times");
+        if (hint) hint.textContent = "Could not load clinic hours. Try another date.";
+        return;
+      }
+      const data = await res.json();
+      bookFreeSlots = Array.isArray(data.slots) ? data.slots : [];
+      fillBookTimeSelect(bookFreeSlots, previous);
+      if (hint) {
+        if (data.closed || !bookFreeSlots.length) {
+          hint.textContent = "Clinic closed on this date. Pick another day.";
+        } else if (data.open_time && data.close_time) {
+          hint.textContent = `Clinic hours: ${formatBookTimeLabel(data.open_time)} - ${formatBookTimeLabel(data.close_time)}`;
+        } else {
+          const first = formatBookTimeLabel(bookFreeSlots[0]);
+          const last = formatBookTimeLabel(bookFreeSlots[bookFreeSlots.length - 1]);
+          hint.textContent = `Clinic hours: ${first} - ${last}`;
+        }
+      }
+    } catch (_e) {
+      resetBookTimeSelect("Could not load times");
+      if (hint) hint.textContent = "Could not load clinic hours. Try another date.";
+    }
+  }
+
+  function timeMatchesFreeSlot(raw) {
+    const hhmm = toHhmm(raw) || String(raw || "").trim();
+    if (!hhmm || !bookFreeSlots.length) return false;
+    return bookFreeSlots.includes(hhmm);
   }
 
   function syncBookCalSelectors() {
@@ -1430,12 +1725,13 @@
     }
   }
 
-  function renderBookCalendar() {
+  async function renderBookCalendar() {
     const grid = $("#book-cal-grid");
     const dateInput = $("#book-date");
     if (!grid || !bookCalMonth) return;
 
     syncBookCalSelectors();
+    await loadBookMonthMeta();
 
     const year = bookCalMonth.getFullYear();
     const month = bookCalMonth.getMonth();
@@ -1453,13 +1749,18 @@
     }
     for (let day = 1; day <= daysInMonth; day += 1) {
       const iso = toLocalISODate(new Date(year, month, day));
-      const disabled =
-        iso < minIso || iso > maxIso || new Date(`${iso}T12:00:00`).getDay() === 0;
+      const meta = bookMonthMeta[iso] || {};
+      const outOfRange = iso < minIso || iso > maxIso;
+      const closedOrFull = !!meta.closed || !!meta.full;
+      const sundayFallback = !Object.keys(bookMonthMeta).length && new Date(`${iso}T12:00:00`).getDay() === 0;
+      const disabled = outOfRange || closedOrFull || sundayFallback;
       const classes = [
         "book-cal-day",
         selected === iso ? "is-selected" : "",
         iso === todayIso ? "is-today" : "",
         disabled ? "is-disabled" : "",
+        meta.full ? "is-full" : "",
+        meta.closed ? "is-closed" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -1470,7 +1771,7 @@
     grid.innerHTML = cells.join("");
   }
 
-  function selectBookDate(iso) {
+  async function selectBookDate(iso) {
     const dateInput = $("#book-date");
     const display = $("#book-date-display");
     const trigger = $("#book-date-trigger");
@@ -1479,17 +1780,20 @@
     if (display) display.textContent = formatBookDateLabel(iso);
     if (trigger) trigger.classList.add("has-value");
     closeBookPickers();
+    await loadBookFreeSlots(iso);
     updateBookSubmitEnabled(false);
   }
 
   function selectBookTime(value) {
     const timeInput = $("#book-time");
     if (!timeInput) return;
-    timeInput.value = value ? formatBookTimeLabel(value) : BOOK_DEFAULT_TIME;
+    if (value && bookFreeSlots.includes(toHhmm(value) || value)) {
+      timeInput.value = toHhmm(value) || value;
+    }
     updateBookSubmitEnabled(false);
   }
 
-  function buildBookTimeMenu() { /* no-op — editable text time */ }
+  function buildBookTimeMenu() { /* slots filled from Clinic Hours API */ }
 
   function updateBookSubmitEnabled(showErrors = false) {
     const btn = $("#book-submit");
@@ -1561,21 +1865,15 @@
 
     if (!time) {
       timeMsg = showErrors || timeInput.dataset.touched === "1" ? "Please choose a time." : "";
+    } else if (!date) {
+      timeMsg = "Choose a date first.";
+    } else if (!bookFreeSlots.length) {
+      timeMsg = "No open times on this date.";
+    } else if (!timeMatchesFreeSlot(time)) {
+      timeMsg = "That time is not available. Pick an open slot.";
+      timeInput.dataset.touched = "1";
     } else {
-      const parsed = parseBookTime(time);
-      if (!parsed) {
-        timeMsg = "Use a time like 12:00 PM.";
-        timeInput.dataset.touched = "1";
-      } else if (!isBookTimeInClinicHours(parsed)) {
-        timeMsg = "Choose a time between 9:00 AM and 8:00 PM.";
-        timeInput.dataset.touched = "1";
-      } else {
-        timeOk = true;
-        const normalized = formatBookTimeLabel(time);
-        if (timeInput.value !== normalized && document.activeElement !== timeInput) {
-          timeInput.value = normalized;
-        }
-      }
+      timeOk = true;
     }
 
     setFieldFeedback("#book-name-feedback", nameMsg, nameOk);
@@ -1596,52 +1894,93 @@
     btn.disabled = !(nameOk && emailOk && phoneOk && dateOk && timeOk);
   }
 
-  function openBookModal() {
+  async function openBookModal() {
     const modal = $("#book-modal");
     const form = $("#book-form");
     const success = $("#book-success");
     const status = $("#book-status");
+    const openBtn = $("#open-book-modal");
     if (!modal) return;
 
-    if (form) form.hidden = false;
-    if (success) success.hidden = true;
-    if (status) setStatus(status, "");
+    const prevBtnLabel = openBtn?.textContent || "Book an appointment";
+    if (openBtn) {
+      openBtn.disabled = true;
+      openBtn.textContent = "Checking…";
+    }
+
+    bookSubmitting = false;
     closeBookPickers();
 
-    const email = $("#book-email");
-    const phone = $("#book-phone");
-    if (email && state.email) email.value = state.email;
-    if (phone && state.phone) {
-      const digits = state.phone.replace(/\D/g, "");
-      phone.value = digits.startsWith("92") ? digits.slice(2) : digits.replace(/^0/, "");
-    }
+    try {
+      // Resolve booking state before showing the modal so the form never flashes.
+      if (!existingBooking) {
+        existingBooking = await fetchExistingBooking();
+      }
 
-    const min = bookMinDate();
-    bookCalMonth = new Date(min.getFullYear(), min.getMonth(), 1);
-    const dateInput = $("#book-date");
-    const timeInput = $("#book-time");
-    if (dateInput && !dateInput.value) {
-      // leave empty until user picks — required for disabled submit
-      dateInput.value = "";
-      $("#book-date-display").textContent = "Select a date";
-      $("#book-date-trigger")?.classList.remove("has-value");
-    } else if (dateInput?.value) {
-      $("#book-date-display").textContent = formatBookDateLabel(dateInput.value);
-      $("#book-date-trigger")?.classList.add("has-value");
-      const selected = new Date(`${dateInput.value}T12:00:00`);
-      bookCalMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
-    }
-    if (timeInput) {
-      timeInput.value = BOOK_DEFAULT_TIME;
-      timeInput.dataset.touched = "";
-    }
+      if (form) form.hidden = true;
+      if (success) success.hidden = true;
+      if (status) setStatus(status, "");
 
-    renderBookCalendar();
-    updateBookSubmitEnabled(false);
+      if (existingBooking) {
+        showAlreadyBookedState(existingBooking);
+        modal.hidden = false;
+        document.body.classList.add("book-open");
+        return;
+      }
 
-    modal.hidden = false;
-    document.body.classList.add("book-open");
-    $("#book-name")?.focus();
+      const email = $("#book-email");
+      const phone = $("#book-phone");
+      if (email) {
+        email.value = state.email || "";
+        email.readOnly = true;
+        email.disabled = true;
+      }
+      if (phone) {
+        if (state.phone) {
+          const digits = state.phone.replace(/\D/g, "");
+          phone.value = digits.startsWith("92") ? digits.slice(2) : digits.replace(/^0/, "");
+        } else {
+          phone.value = "";
+        }
+        phone.readOnly = true;
+        phone.disabled = true;
+      }
+
+      const min = bookMinDate();
+      bookCalMonth = new Date(min.getFullYear(), min.getMonth(), 1);
+      const dateInput = $("#book-date");
+      const timeInput = $("#book-time");
+      if (dateInput && !dateInput.value) {
+        dateInput.value = "";
+        $("#book-date-display").textContent = "Select a date";
+        $("#book-date-trigger")?.classList.remove("has-value");
+      } else if (dateInput?.value) {
+        $("#book-date-display").textContent = formatBookDateLabel(dateInput.value);
+        $("#book-date-trigger")?.classList.add("has-value");
+        const selected = new Date(`${dateInput.value}T12:00:00`);
+        bookCalMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+      }
+      if (timeInput) {
+        resetBookTimeSelect("Select a date first");
+        const hint = $("#book-time-hint");
+        if (hint) hint.textContent = "Clinic hours are set by the practice.";
+      }
+
+      if (form) form.hidden = false;
+      if (success) success.hidden = true;
+      modal.hidden = false;
+      document.body.classList.add("book-open");
+      $("#book-name")?.focus();
+
+      await renderBookCalendar();
+      if (dateInput?.value) await loadBookFreeSlots(dateInput.value);
+      updateBookSubmitEnabled(false);
+    } finally {
+      if (openBtn) {
+        openBtn.disabled = false;
+        openBtn.textContent = prevBtnLabel;
+      }
+    }
   }
 
   function closeBookModal() {
@@ -1669,7 +2008,7 @@
       }
     });
 
-    ["#book-name", "#book-email", "#book-phone"].forEach((sel) => {
+    ["#book-name"].forEach((sel) => {
       const el = $(sel);
       if (!el) return;
       el.addEventListener("input", () => updateBookSubmitEnabled(false));
@@ -1679,13 +2018,7 @@
       });
     });
 
-    const bookPhone = $("#book-phone");
-    if (bookPhone) {
-      bookPhone.addEventListener("input", () => {
-        const cleaned = bookPhone.value.replace(/[^\d\s]/g, "");
-        if (cleaned !== bookPhone.value) bookPhone.value = cleaned;
-      });
-    }
+    // Email/phone are locked to the assessment details; do not wire edit handlers.
 
     $("#book-date-trigger")?.addEventListener("click", () => {
       const cal = $("#book-cal");
@@ -1700,18 +2033,9 @@
       }
     });
 
-    $("#book-time")?.addEventListener("input", () => {
-      $("#book-time").dataset.touched = "1";
-      updateBookSubmitEnabled(false);
-    });
-    $("#book-time")?.addEventListener("blur", () => {
-      const el = $("#book-time");
-      if (!el) return;
-      const parsed = parseBookTime(el.value);
-      if (parsed) el.value = formatBookTimeLabel(el.value);
-      updateBookSubmitEnabled(false);
-    });
     $("#book-time")?.addEventListener("change", () => {
+      const el = $("#book-time");
+      if (el) el.dataset.touched = "1";
       updateBookSubmitEnabled(false);
     });
 
@@ -1771,18 +2095,26 @@
       closeBookPickers();
     });
 
-    $("#book-form")?.addEventListener("submit", (e) => {
+    $("#book-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (bookSubmitting) return;
+      if (existingBooking) {
+        showAlreadyBookedState(existingBooking);
+        return;
+      }
       updateBookSubmitEnabled(true);
       const name = $("#book-name")?.value.trim() || "";
-      const email = $("#book-email")?.value.trim() || "";
-      const phoneRaw = $("#book-phone")?.value.trim() || "";
+      const email = (state.email || $("#book-email")?.value.trim() || "");
+      const phoneRaw = state.phone
+        ? String(state.phone).replace(/^\+92/, "").replace(/\D/g, "").replace(/^92/, "")
+        : ($("#book-phone")?.value.trim() || "");
       const date = $("#book-date")?.value || "";
       const time = $("#book-time")?.value || "";
       const note = $("#book-note")?.value.trim() || "";
       const status = $("#book-status");
+      const submitBtn = $("#book-submit");
 
-      if ($("#book-submit")?.disabled) {
+      if (submitBtn?.disabled) {
         setStatus(status, "Please complete all required fields.", true);
         return;
       }
@@ -1790,34 +2122,63 @@
       const phone = formatPakistaniPhone(phoneRaw);
       const timeLabel = formatBookTimeLabel(time);
       const dateLabel = formatBookDateLabel(date);
+      const parsed = parseBookTime(time);
+      const time24 = parsed
+        ? `${String(parsed.hours).padStart(2, "0")}:${String(parsed.minutes).padStart(2, "0")}`
+        : time;
 
-      const subject = encodeURIComponent("Virtual Smile Assessment booking");
-      const body = encodeURIComponent(
-        [
-          `Name: ${name}`,
-          `Email: ${email}`,
-          `Phone: ${phone}`,
-          `Preferred date: ${dateLabel}`,
-          `Preferred time: ${timeLabel}`,
-          note ? `Note: ${note}` : "",
-          "",
-          "Requested via Virtual Smile Assessment.",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
+      bookSubmitting = true;
+      submitBtn.disabled = true;
+      setStatus(status, "Booking your appointment…");
+      try {
+        const res = await fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            email,
+            phone,
+            date,
+            time: time24,
+            note: note || null,
+            assessment_id: state.assessmentId || null,
+            source: "patient",
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = typeof data.detail === "string" ? data.detail : "Could not book that slot.";
+          if (/already have an appointment/i.test(detail)) {
+            existingBooking = await fetchExistingBooking();
+            if (existingBooking) {
+              showAlreadyBookedState(existingBooking);
+              return;
+            }
+          }
+          if (res.status === 409 && date) {
+            await loadBookFreeSlots(date);
+            await renderBookCalendar();
+          }
+          setStatus(status, detail, true);
+          bookSubmitting = false;
+          updateBookSubmitEnabled(true);
+          return;
+        }
 
-      const mail = document.createElement("a");
-      mail.href = `mailto:hello@theglobaldentist.com?subject=${subject}&body=${body}`;
-      mail.click();
-
-      const form = $("#book-form");
-      const success = $("#book-success");
-      const copy = $("#book-success-copy");
-      if (form) form.hidden = true;
-      if (success) success.hidden = false;
-      if (copy) {
-        copy.textContent = `Thanks ${name.split(" ")[0]}. We’ve noted ${dateLabel} at ${timeLabel}. Check your email app to send the request, or wait for our confirmation.`;
+        existingBooking = data;
+        const form = $("#book-form");
+        const success = $("#book-success");
+        const copy = $("#book-success-copy");
+        if (form) form.hidden = true;
+        if (success) success.hidden = false;
+        if (copy) {
+          copy.textContent = `Thanks ${name.split(" ")[0]}. You’re booked for ${dateLabel} at ${timeLabel}. We’ll confirm by email shortly.`;
+        }
+        setStatus(status, "");
+      } catch (_err) {
+        setStatus(status, "Network error. Please try again.", true);
+        bookSubmitting = false;
+        updateBookSubmitEnabled(false);
       }
     });
   }
@@ -1838,30 +2199,6 @@
       showHeroOnly();
     });
   }
-
-  $("#start-over").addEventListener("click", () => {
-    state.frontFile = null;
-    state.leftFile = null;
-    state.rightFile = null;
-    state.reportText = "";
-    state.findings = null;
-    state.simulationAllowed = true;
-    setPhotosLocked(false);
-    resetChatLimit();
-    ["#front-image", "#left-image", "#right-image"].forEach((sel) => {
-      const input = $(sel);
-      const tile = input.closest(".upload-tile");
-      const key = tile?.dataset.upload === "front" ? "frontFile" : tile?.dataset.upload === "left" ? "leftFile" : "rightFile";
-      if (tile && input) clearUploadTile(tile, input, key);
-    });
-    $("#run-analysis").disabled = true;
-    const simBlock = $("#sim-block");
-    if (simBlock) simBlock.hidden = false;
-    const simSkipNote = $("#sim-skip-note");
-    if (simSkipNote) simSkipNote.hidden = true;
-    showStep(1);
-    showHeroOnly();
-  });
 
   wireUploads();
   showStep(1);

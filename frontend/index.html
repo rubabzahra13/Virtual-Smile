@@ -151,6 +151,7 @@
                 <span>I understand this is a preliminary AI assessment and not a clinical diagnosis.</span>
               </label>
               <p class="field-feedback consent-feedback" id="consent-feedback" aria-live="polite"></p>
+              <p id="details-status" class="status" role="status" aria-live="polite"></p>
               <div class="form-spacer" aria-hidden="true"></div>
               <div class="details-actions">
                 <button type="submit" class="btn btn-primary" id="continue-to-photos" disabled>Continue to photos</button>
@@ -322,8 +323,6 @@
               <p>Confirm findings and get a personalised treatment plan.</p>
               <button type="button" class="btn btn-primary" id="open-book-modal">Book an appointment</button>
             </div>
-
-            <button type="button" class="btn btn-ghost" id="start-over">Start a new assessment</button>
           </div>
         </div>
       </div>
@@ -414,7 +413,7 @@
       <div class="book-modal-head">
         <div>
           <h3 id="book-modal-title">Book an appointment</h3>
-          <p>Choose a date and time. We’ll confirm by email or phone.</p>
+          <p>Choose a date and time. We’ll confirm by email.</p>
         </div>
         <button type="button" class="book-modal-close" data-book-close aria-label="Close">×</button>
       </div>
@@ -427,14 +426,14 @@
         </label>
         <label class="field" for="book-email">
           <span class="field-label">Email</span>
-          <input type="email" id="book-email" name="email" required placeholder="you@email.com" autocomplete="email" />
+          <input type="email" id="book-email" name="email" required placeholder="you@email.com" autocomplete="email" readonly disabled />
           <span class="field-feedback" id="book-email-feedback" aria-live="polite"></span>
         </label>
         <label class="field" for="book-phone">
           <span class="field-label">Mobile number</span>
           <span class="phone-input-row">
             <span class="phone-prefix" aria-hidden="true">+92</span>
-            <input type="tel" id="book-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
+            <input type="tel" id="book-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" readonly disabled />
           </span>
           <span class="field-feedback" id="book-phone-feedback" aria-live="polite"></span>
         </label>
@@ -484,18 +483,16 @@
           </div>
           <div class="field">
             <label class="field-label" for="book-time">Preferred time</label>
-            <input
-              type="text"
+            <select
               id="book-time"
               name="time"
               required
-              value="12:00 PM"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="12:00 PM"
+              disabled
               aria-describedby="book-time-hint"
-            />
-            <span class="book-time-hint" id="book-time-hint">Clinic hours 9:00 AM – 8:00 PM</span>
+            >
+              <option value="">Select a date first</option>
+            </select>
+            <span class="book-time-hint" id="book-time-hint">Clinic hours are set by the practice.</span>
             <span class="field-feedback" id="book-time-feedback" aria-live="polite"></span>
           </div>
         </div>
@@ -509,7 +506,7 @@
 
       <div class="book-success" id="book-success" hidden>
         <h4>Request received</h4>
-        <p id="book-success-copy">We’ll confirm your preferred slot shortly.</p>
+        <p id="book-success-copy">We’ll confirm your preferred slot by email shortly.</p>
         <button type="button" class="btn btn-primary" data-book-close>Done</button>
       </div>
     </div>

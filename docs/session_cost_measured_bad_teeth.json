@@ -1,0 +1,364 @@
+{
+  "measured_at": "2026-07-28T17:18:15Z",
+  "scenario": {
+    "case": "bad_teeth_complex",
+    "images": 3,
+    "image_files": [
+      "oral changes 2.jpg (upscaled x3 as front/left/right)"
+    ],
+    "prepared_size": [
+      1280,
+      874
+    ],
+    "prepared_bytes": 147961,
+    "analysis_passes": [
+      "quality",
+      "detection",
+      "explanation"
+    ],
+    "simulation": true,
+    "chat_messages": 5,
+    "total_llm_calls": 9,
+    "quality_ok": true,
+    "continued_despite_quality": false
+  },
+  "pricing_source": "https://ai.google.dev/gemini-api/docs/pricing",
+  "rates_usd_per_1m": {
+    "gemini-3.5-flash-lite": {
+      "input": 0.3,
+      "output": 2.5
+    },
+    "gemini-3.1-flash-image-preview": {
+      "input": 0.5,
+      "output_text": 3.0,
+      "output_image": 60.0
+    }
+  },
+  "overall_score": 66,
+  "report_chars": 4314,
+  "steps": [
+    {
+      "step": "quality",
+      "model": "gemini-3.5-flash-lite",
+      "latency_seconds": 2.558,
+      "usage_metadata": {
+        "prompt_token_count": 3475,
+        "candidates_token_count": 114,
+        "total_token_count": 3589,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.IMAGE",
+            "token_count": 3240
+          },
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 235
+          }
+        ]
+      },
+      "input_tokens": 3475,
+      "output_tokens": 114,
+      "response_chars": 296,
+      "cost_usd": 0.0013275,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "detection",
+      "model": "gemini-3.5-flash-lite",
+      "latency_seconds": 3.901,
+      "usage_metadata": {
+        "prompt_token_count": 5395,
+        "candidates_token_count": 662,
+        "total_token_count": 6057,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 2155
+          },
+          {
+            "modality": "MediaModality.IMAGE",
+            "token_count": 3240
+          }
+        ]
+      },
+      "input_tokens": 5395,
+      "output_tokens": 662,
+      "response_chars": 2107,
+      "cost_usd": 0.0032735,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "explanation",
+      "model": "gemini-3.5-flash-lite",
+      "latency_seconds": 2.405,
+      "usage_metadata": {
+        "prompt_token_count": 854,
+        "candidates_token_count": 545,
+        "total_token_count": 1399,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 854
+          }
+        ]
+      },
+      "input_tokens": 854,
+      "output_tokens": 545,
+      "response_chars": 2083,
+      "cost_usd": 0.0016187,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "simulation",
+      "model": "gemini-3.1-flash-image-preview",
+      "latency_seconds": 15.225,
+      "got_image": true,
+      "edit_image_bytes": 142787,
+      "usage_metadata": {
+        "prompt_token_count": 810,
+        "candidates_token_count": 1395,
+        "total_token_count": 2205,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 552
+          },
+          {
+            "modality": "MediaModality.IMAGE",
+            "token_count": 258
+          }
+        ],
+        "candidates_tokens_details": [
+          {
+            "modality": "MediaModality.IMAGE",
+            "token_count": 1120
+          }
+        ]
+      },
+      "input_tokens": 810,
+      "text_output_tokens": 275,
+      "image_output_tokens": 1120,
+      "output_tokens": 1395,
+      "cost_usd": 0.06843,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "chat",
+      "model": "gemini-3.5-flash-lite",
+      "question": "What are my main dental concerns from this report?",
+      "answer_chars": 441,
+      "latency_seconds": 1.211,
+      "usage_metadata": {
+        "prompt_token_count": 1100,
+        "candidates_token_count": 80,
+        "total_token_count": 1180,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 1100
+          }
+        ]
+      },
+      "input_tokens": 1100,
+      "output_tokens": 80,
+      "cost_usd": 0.00053,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "chat",
+      "model": "gemini-3.5-flash-lite",
+      "question": "Do I need braces or clear aligners based on these findings?",
+      "answer_chars": 451,
+      "latency_seconds": 1.156,
+      "usage_metadata": {
+        "prompt_token_count": 1103,
+        "candidates_token_count": 88,
+        "total_token_count": 1191,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 1103
+          }
+        ]
+      },
+      "input_tokens": 1103,
+      "output_tokens": 88,
+      "cost_usd": 0.0005509,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "chat",
+      "model": "gemini-3.5-flash-lite",
+      "question": "How urgent is gum or plaque care according to the assessment?",
+      "answer_chars": 408,
+      "latency_seconds": 2.521,
+      "usage_metadata": {
+        "prompt_token_count": 1102,
+        "candidates_token_count": 69,
+        "total_token_count": 1171,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 1102
+          }
+        ]
+      },
+      "input_tokens": 1102,
+      "output_tokens": 69,
+      "cost_usd": 0.0005031,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "chat",
+      "model": "gemini-3.5-flash-lite",
+      "question": "What whitening options make sense for my tooth color findings?",
+      "answer_chars": 320,
+      "latency_seconds": 1.046,
+      "usage_metadata": {
+        "prompt_token_count": 1101,
+        "candidates_token_count": 58,
+        "total_token_count": 1159,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 1101
+          }
+        ]
+      },
+      "input_tokens": 1101,
+      "output_tokens": 58,
+      "cost_usd": 0.0004753,
+      "source": "raw_usage_metadata"
+    },
+    {
+      "step": "chat",
+      "model": "gemini-3.5-flash-lite",
+      "question": "What should I ask the dentist at my consultation after this AI report?",
+      "answer_chars": 436,
+      "latency_seconds": 1.787,
+      "usage_metadata": {
+        "prompt_token_count": 1104,
+        "candidates_token_count": 82,
+        "total_token_count": 1186,
+        "prompt_tokens_details": [
+          {
+            "modality": "MediaModality.TEXT",
+            "token_count": 1104
+          }
+        ]
+      },
+      "input_tokens": 1104,
+      "output_tokens": 82,
+      "cost_usd": 0.0005362,
+      "source": "raw_usage_metadata"
+    }
+  ],
+  "formula_steps": [
+    {
+      "step": "quality",
+      "formula": "(3475/1e6)*0.30 + (114/1e6)*2.50",
+      "cost_usd": 0.0013275
+    },
+    {
+      "step": "detection",
+      "formula": "(5395/1e6)*0.30 + (662/1e6)*2.50",
+      "cost_usd": 0.0032735
+    },
+    {
+      "step": "explanation",
+      "formula": "(854/1e6)*0.30 + (545/1e6)*2.50",
+      "cost_usd": 0.0016187
+    },
+    {
+      "step": "simulation",
+      "formula": "(810/1e6)*0.50 + (275/1e6)*3.00 + (1120/1e6)*60.00",
+      "cost_usd": 0.06843
+    },
+    {
+      "step": "chat: What are my main dental concerns from this report?",
+      "formula": "(1100/1e6)*0.30 + (80/1e6)*2.50",
+      "cost_usd": 0.00053
+    },
+    {
+      "step": "chat: Do I need braces or clear aligners based on these ",
+      "formula": "(1103/1e6)*0.30 + (88/1e6)*2.50",
+      "cost_usd": 0.0005509
+    },
+    {
+      "step": "chat: How urgent is gum or plaque care according to the ",
+      "formula": "(1102/1e6)*0.30 + (69/1e6)*2.50",
+      "cost_usd": 0.0005031
+    },
+    {
+      "step": "chat: What whitening options make sense for my tooth col",
+      "formula": "(1101/1e6)*0.30 + (58/1e6)*2.50",
+      "cost_usd": 0.0004753
+    },
+    {
+      "step": "chat: What should I ask the dentist at my consultation a",
+      "formula": "(1104/1e6)*0.30 + (82/1e6)*2.50",
+      "cost_usd": 0.0005362
+    }
+  ],
+  "session_totals": {
+    "input_tokens": 16044,
+    "output_tokens": 3093,
+    "total_tokens": 19137,
+    "cost_usd": 0.0772452
+  },
+  "monthly_projections_usd": {
+    "100_max_sessions": 7.7245,
+    "500_max_sessions": 38.6226,
+    "1000_max_sessions": 77.2452,
+    "5000_max_sessions": 386.226,
+    "10000_max_sessions": 772.452
+  },
+  "by_category": {
+    "quality": {
+      "input_tokens": 3475,
+      "output_tokens": 114,
+      "cost_usd": 0.0013275,
+      "calls": 1
+    },
+    "detection": {
+      "input_tokens": 5395,
+      "output_tokens": 662,
+      "cost_usd": 0.0032735,
+      "calls": 1
+    },
+    "explanation": {
+      "input_tokens": 854,
+      "output_tokens": 545,
+      "cost_usd": 0.0016187,
+      "calls": 1
+    },
+    "simulation": {
+      "input_tokens": 810,
+      "output_tokens": 1395,
+      "cost_usd": 0.06843,
+      "calls": 1
+    },
+    "chat": {
+      "input_tokens": 5510,
+      "output_tokens": 377,
+      "cost_usd": 0.0025955,
+      "calls": 5
+    }
+  },
+  "notes": [
+    "Complex clinical photo (oral changes 2.jpg), upscaled to long-edge 1280 for realistic upload tokens.",
+    "Same image used as front/left/right to exercise 3-image max path.",
+    "Tokens from Gemini usage_metadata on live API calls."
+  ],
+  "comparison_vs_clean_100": {
+    "clean_cost_usd": 0.0743488,
+    "bad_cost_usd": 0.0772452,
+    "delta_usd": 0.0028964,
+    "clean_tokens": 15676,
+    "bad_tokens": 19137,
+    "clean_score": 100,
+    "bad_score": 66,
+    "clean_report_chars": 1930,
+    "bad_report_chars": 4314
+  }
+}

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Admin Console - The Global Dentist</title>
+  <meta name="description" content="Secure admin console for The Global Dentist - manage reports, appointments and clinic hours." />
+  <link rel="stylesheet" href="/static/admin/admin.css" />
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════
+       LOGIN SCREEN
+  ════════════════════════════════════════════════════ -->
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card" novalidate>
+
+      <!-- Brand -->
+      <div class="login-logo">
+        <img src="/static/assets/logo.png" alt="The Global Dentist logo" class="login-logo-img" />
+        <div class="login-logo-text">
+          <span class="eyebrow">The Global Dentist</span>
+          <span class="brand-name">ADMIN</span>
+        </div>
+      </div>
+
+      <h1>Welcome back</h1>
+      <p class="login-lead">Sign in to access reports, appointments, and clinic settings.</p>
+
+      <div class="login-divider"></div>
+
+      <div id="login-error" class="error-msg" hidden>
+        <!-- icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="login-error-text"></span>
+      </div>
+
+      <label class="field">
+        <span>Admin password</span>
+        <input
+          type="password"
+          id="admin-password"
+          autocomplete="current-password"
+          placeholder="Enter your password"
+          required
+        />
+      </label>
+
+      <button type="submit" id="login-submit" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign in
+      </button>
+
+    </form>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════
+       APP SHELL
+  ════════════════════════════════════════════════════ -->
+  <div id="app-shell" class="app-shell" hidden>
+
+    <!-- ── Sidebar ─────────────────────────────────── -->
+    <aside class="admin-sidebar" role="navigation" aria-label="Admin navigation">
+
+      <!-- Brand -->
+      <div class="sidebar-brand">
+        <div class="sidebar-logo-row">
+          <img src="/static/assets/logo.png" alt="" class="sidebar-logo-img" aria-hidden="true" />
+          <div class="sidebar-logo-text">
+            <span class="sidebar-brand-label">THE GLOBAL DENTIST</span>
+            <span class="sidebar-sub">Admin Console</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav items -->
+      <nav class="admin-nav" role="tablist">
+        <span class="nav-section-label">Overview</span>
+
+        <button type="button" class="tab is-active" data-tab="dashboard" role="tab" aria-selected="true" id="tab-dashboard">
+          <!-- chart icon -->
+          <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </button>
+
+        <span class="nav-section-label">Patients</span>
+
+        <button type="button" class="tab" data-tab="reports" role="tab" aria-selected="false" id="tab-reports">
+          <!-- file-text icon -->
+          <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Assessment Reports
+        </button>
+
+        <button type="button" class="tab" data-tab="appointments" role="tab" aria-selected="false" id="tab-appointments">
+          <!-- calendar icon -->
+          <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Appointments
+        </button>
+
+        <button type="button" class="tab" data-tab="book" role="tab" aria-selected="false" id="tab-book">
+          <!-- plus-circle icon -->
+          <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          New Booking
+        </button>
+
+        <span class="nav-section-label">Settings</span>
+
+        <button type="button" class="tab" data-tab="hours" role="tab" aria-selected="false" id="tab-hours">
+          <!-- clock icon -->
+          <svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Clinic Hours
+        </button>
+      </nav>
+
+      <!-- Footer -->
+      <div class="sidebar-footer">
+        <button type="button" id="logout-btn" class="logout-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── Main area ────────────────────────────────── -->
+    <main class="admin-main" role="main">
+
+      <!-- Top bar -->
+      <header class="admin-topbar" role="banner">
+        <div class="topbar-left">
+          <p class="topbar-eyebrow" id="topbar-eyebrow">Operations</p>
+          <h2 class="top-title" id="top-title">Clinic Dashboard</h2>
+          <p class="top-subtitle" id="top-subtitle">Live overview of assessments and appointments.</p>
+        </div>
+        <div class="topbar-right"></div>
+      </header>
+
+      <!-- Content -->
+      <div class="admin-content">
+
+        <!-- ── Dashboard panel ─────────────────────── -->
+        <section id="panel-dashboard" class="panel is-active" role="tabpanel" aria-labelledby="tab-dashboard">
+
+          <!-- KPI grid -->
+          <div class="stat-grid" id="stat-grid">
+            <div class="stat-card">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <span class="stat-label">Total Assessments</span>
+              <strong id="stat-assessments">—</strong>
+              <p class="stat-trend">AI smile reports completed</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <span class="stat-label">Total Bookings</span>
+              <strong id="stat-bookings">—</strong>
+              <p class="stat-trend">Confirmed appointments</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <span class="stat-label">Avg Smile Score</span>
+              <strong id="stat-avg">—</strong>
+              <p class="stat-trend">Out of 100</p>
+            </div>
+          </div>
+
+          <!-- Rank cards -->
+          <div class="split">
+            <div class="rank-card">
+              <div class="rank-card-header">
+                <h2>Top Concerns</h2>
+                <div class="rank-card-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+              </div>
+              <ul id="top-concerns" class="rank-list" aria-label="Top concerns"></ul>
+            </div>
+            <div class="rank-card">
+              <div class="rank-card-header">
+                <h2>Top Treatments</h2>
+                <div class="rank-card-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+              </div>
+              <ul id="top-treatments" class="rank-list" aria-label="Top treatments"></ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Reports panel ───────────────────────── -->
+        <section id="panel-reports" class="panel" role="tabpanel" aria-labelledby="tab-reports" hidden>
+
+          <div class="toolbar">
+            <div class="toolbar-search-wrap">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="reports-q" placeholder="Search email, phone, concern…" aria-label="Search reports" />
+            </div>
+            <div class="toolbar-filters">
+              <select id="reports-sort" aria-label="Sort reports">
+                <option value="created_at:desc">Newest first</option>
+                <option value="created_at:asc">Oldest first</option>
+                <option value="overall_score:desc">Score high → low</option>
+                <option value="overall_score:asc">Score low → high</option>
+              </select>
+              <input type="number" id="reports-min" placeholder="Min score" min="0" max="100" aria-label="Minimum score" style="max-width:110px" />
+              <input type="number" id="reports-max" placeholder="Max score" min="0" max="100" aria-label="Maximum score" style="max-width:110px" />
+            </div>
+          </div>
+
+          <div id="reports-list" class="data-list" role="list"></div>
+        </section>
+
+        <!-- ── Appointments panel ──────────────────── -->
+        <section id="panel-appointments" class="panel" role="tabpanel" aria-labelledby="tab-appointments" hidden>
+
+          <div class="toolbar">
+            <div class="toolbar-search-wrap">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="bookings-q" placeholder="Search name, email, phone, date…" aria-label="Search appointments" />
+            </div>
+            <div class="toolbar-filters">
+              <select id="bookings-sort" aria-label="Sort appointments">
+                <option value="date:desc">Date newest</option>
+                <option value="date:asc">Date oldest</option>
+                <option value="created_at:desc">Booked newest</option>
+                <option value="name:asc">Name A-Z</option>
+              </select>
+              <select id="bookings-status" aria-label="Filter by status">
+                <option value="confirmed">Confirmed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="bookings-list" class="data-list" role="list"></div>
+        </section>
+
+        <!-- ── New Booking panel ───────────────────── -->
+        <section id="panel-book" class="panel" role="tabpanel" aria-labelledby="tab-book" hidden>
+          <div class="section-card">
+            <div class="section-card-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <h2>Book an in-person visit</h2>
+            </div>
+            <div class="section-card-body">
+              <p class="section-card-lead" style="margin-bottom:1.5rem">Create a manual appointment for walk-in patients or those who contacted the clinic directly.</p>
+
+              <form id="walkin-form" class="stack-form">
+
+                <div class="form-section">
+                  <p class="form-section-title">Patient information</p>
+                  <div class="field">
+                    <label for="w-name" class="field-label">Full name</label>
+                    <input id="w-name" type="text" placeholder="e.g. Sarah Ahmed" required autocomplete="name" />
+                  </div>
+                  <div class="form-grid-2">
+                    <div class="field">
+                      <label for="w-email" class="field-label">Email address</label>
+                      <input id="w-email" type="email" placeholder="patient@email.com" required autocomplete="email" />
+                    </div>
+                    <div class="field">
+                      <label for="w-phone" class="field-label">Phone number</label>
+                      <input id="w-phone" type="tel" placeholder="+92 300 000 0000" required autocomplete="tel" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-section">
+                  <p class="form-section-title">Appointment details</p>
+                  <div class="form-grid-2">
+                    <div class="field">
+                      <label for="w-date" class="field-label">Date</label>
+                      <input id="w-date" type="date" required />
+                    </div>
+                    <div class="field">
+                      <label for="w-time" class="field-label">Time</label>
+                      <select id="w-time" required disabled>
+                        <option value="">Select a date first</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p id="w-slots-hint" class="stat-trend" style="margin-bottom:0.85rem;font-size:0.8rem;color:var(--teal-dark)"></p>
+                  <div class="field">
+                    <label for="w-note" class="field-label">Notes (optional)</label>
+                    <textarea id="w-note" placeholder="Any relevant notes about the visit…" rows="3"></textarea>
+                  </div>
+                </div>
+
+                <p id="walkin-status" class="status" role="status"></p>
+                <button type="submit" class="btn btn-teal" style="width:auto;padding:0.72rem 1.8rem">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                  Confirm booking
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Clinic Hours panel ──────────────────── -->
+        <section id="panel-hours" class="panel" role="tabpanel" aria-labelledby="tab-hours" hidden>
+
+          <div class="section-card" style="margin-bottom:1rem">
+            <div class="section-card-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <h2>Current Schedules</h2>
+            </div>
+            <div class="section-card-body">
+              <div id="schedules-list" class="data-list" role="list"></div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card-header">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <h2>Add a schedule</h2>
+            </div>
+            <div class="section-card-body">
+              <p class="section-card-lead" style="margin-bottom:1.5rem">Set opening hours for a date range. Useful for Ramadan, holidays, or seasonal changes.</p>
+
+              <form id="schedule-form" class="stack-form">
+                <div class="field">
+                  <label for="s-label" class="field-label">Schedule name</label>
+                  <input id="s-label" type="text" required placeholder="e.g. Ramadan hours" />
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="field">
+                    <label for="s-start" class="field-label">Start date</label>
+                    <input id="s-start" type="date" required />
+                  </div>
+                  <div class="field">
+                    <label for="s-end" class="field-label">End date</label>
+                    <input id="s-end" type="date" required />
+                  </div>
+                </div>
+
+                <fieldset class="days-fieldset">
+                  <legend>Open days</legend>
+                  <div class="days-row">
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="1" checked /> Mon</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="2" checked /> Tue</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="3" checked /> Wed</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="4" checked /> Thu</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="5" checked /> Fri</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="6" checked /> Sat</label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="0" /> Sun</label>
+                  </div>
+                </fieldset>
+
+                <div class="form-grid-2">
+                  <div class="field">
+                    <label for="s-open" class="field-label">Open time</label>
+                    <input id="s-open" type="time" value="09:00" required />
+                  </div>
+                  <div class="field">
+                    <label for="s-close" class="field-label">Close time</label>
+                    <input id="s-close" type="time" value="20:00" required />
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label for="s-step" class="field-label">Slot duration (minutes)</label>
+                  <input id="s-step" type="number" value="30" min="5" max="120" style="max-width:140px" />
+                </div>
+
+                <label class="check">
+                  <input type="checkbox" id="s-active" checked />
+                  Mark as active
+                </label>
+
+                <p id="schedule-status" class="status" role="status"></p>
+                <button type="submit" class="btn btn-teal" style="width:auto;padding:0.72rem 1.8rem">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save schedule
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /admin-content -->
+    </main>
+  </div><!-- /app-shell -->
+
+
+  <!-- ════════════════════════════════════════════════════
+       DETAIL DRAWER
+  ════════════════════════════════════════════════════ -->
+  <aside id="drawer" class="drawer" hidden role="complementary">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-header">
+        <h3 class="drawer-title" id="drawer-title">Assessment Detail</h3>
+        <button type="button" class="drawer-close-btn" data-close-drawer aria-label="Close detail panel">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+    </div>
+  </aside>
+
+
+  <script src="/static/admin/admin.js"></script>
+</body>
+</html>

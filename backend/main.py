@@ -28,6 +28,8 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from analysis import run_analysis
+from booking_api import admin_router, check_eligibility, persist_assessment, public_router
+from db import db_ready
 from groq_comparison import run_groq_comparison
 from patient_features import build_chat_prompt, create_smile_simulation
 from providers import call_groq_text
@@ -54,7 +56,7 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         path = request.url.path
-        if path == "/" or path.startswith("/static/"):
+        if path == "/" or path.startswith("/static/") or path.startswith("/admin"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
@@ -65,6 +67,9 @@ app.add_middleware(NoCacheStaticMiddleware)
 
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+app.include_router(public_router)
+app.include_router(admin_router)
 
 
 def _asset_version(filename: str) -> str:
@@ -191,6 +196,29 @@ def frontend_version():
     )
 
 
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+def serve_admin():
+    admin_path = FRONTEND_DIR / "admin" / "index.html"
+    if not admin_path.exists():
+        raise HTTPException(status_code=500, detail="frontend/admin/index.html not found")
+    html = admin_path.read_text(encoding="utf-8")
+    replacements = {
+        "/static/admin/admin.css": f"/static/admin/admin.css?v={_asset_version('admin/admin.css')}",
+        "/static/admin/admin.js": f"/static/admin/admin.js?v={_asset_version('admin/admin.js')}",
+    }
+    for old, new in replacements.items():
+        html = re.sub(rf"{re.escape(old)}(?:\?v=[^\"']*)?", new, html)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def serve_frontend():
     index_path = FRONTEND_DIR / "index.html"
@@ -276,21 +304,31 @@ async def analyze(
     if two_pass is not None:
         use_two_pass = two_pass.lower() in ("1", "true", "yes")
 
+    if db_ready():
+        if not (email or "").strip() or not (phone or "").strip():
+            raise HTTPException(status_code=400, detail="Email and phone are required.")
+        elig = check_eligibility(email or "", phone or "")
+        if not elig.get("ok"):
+            raise HTTPException(status_code=409, detail=elig.get("reason") or "You have already taken an assessment.")
+
     front_bytes = await front_image.read()
     if not front_bytes:
         raise HTTPException(status_code=400, detail="Front smile image was empty.")
 
     images = [(front_bytes, front_image.content_type or "image/jpeg")]
+    report_photos: list[tuple[str, bytes]] = [("Front smile", front_bytes)]
 
     if left_image is not None:
         left_bytes = await left_image.read()
         if left_bytes:
             images.append((left_bytes, left_image.content_type or "image/jpeg"))
+            report_photos.append(("Left smile", left_bytes))
 
     if right_image is not None:
         right_bytes = await right_image.read()
         if right_bytes:
             images.append((right_bytes, right_image.content_type or "image/jpeg"))
+            report_photos.append(("Right smile", right_bytes))
 
     cache_key = _cache_key_for_analysis(
         provider=provider,
@@ -301,7 +339,27 @@ async def analyze(
     )
     cached_payload = ANALYSIS_RESULT_CACHE.get(cache_key)
     if cached_payload is not None:
-        return JSONResponse(cached_payload)
+        payload = json.loads(json.dumps(cached_payload))
+        payload["email"] = email
+        payload["phone"] = phone
+        try:
+            saved = persist_assessment(
+                email=email,
+                phone=phone,
+                overall_score=payload.get("overall_score"),
+                category_scores=payload.get("category_scores"),
+                findings=payload.get("findings"),
+                report_text=payload.get("report_text") or "",
+                images=report_photos,
+            )
+            if saved:
+                payload["assessment_id"] = saved.get("id")
+                payload["email_sent"] = bool(saved.get("email_sent"))
+        except HTTPException:
+            raise
+        except Exception as e:
+            payload["persist_error"] = f"{type(e).__name__}: {e}"
+        return JSONResponse(payload)
 
     try:
         result = run_analysis(
@@ -368,6 +426,27 @@ async def analyze(
             "passes": usage.get("passes"),
         },
     }
+
+    try:
+        saved = persist_assessment(
+            email=email,
+            phone=phone,
+            overall_score=scoring_result.get("overall_score"),
+            category_scores=scoring_result.get("category_scores"),
+            findings=scoring_result.get("findings"),
+            report_text=report_text,
+            images=report_photos,
+        )
+        if saved:
+            payload["assessment_id"] = saved.get("id")
+            payload["email_sent"] = bool(saved.get("email_sent"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Persistence/email failures should not block the patient from seeing results
+        # when DB is misconfigured mid-request after eligibility already passed.
+        payload["persist_error"] = f"{type(e).__name__}: {e}"
+
     _set_cached_result(cache_key, json.loads(json.dumps(payload)))
     return JSONResponse(payload)
 

@@ -18,3 +18,8 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+# Local temp / measurement artifacts
+*.pdf
+backend/_tmp_*
+backend/session_cost_measured*.json
+frontend/admin/session_cost_measured*.json
