@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date as date_cls
 from datetime import datetime
 from typing import Any, List, Literal, Optional
@@ -19,13 +20,80 @@ from db import (
     normalize_email,
     normalize_phone,
 )
-from email_report import send_assessment_email, send_booking_email
+from email_report import send_assessment_email, send_booking_email, send_cancellation_email
+from photo_storage import signed_photo_urls, signed_url_for_path, upload_assessment_photos
 from slots import free_slots_for_date, generate_slots_for_date, month_availability, pick_schedule_for_date
 
 logger = logging.getLogger(__name__)
 
 public_router = APIRouter(prefix="/api", tags=["public"])
 admin_router = APIRouter(prefix="/admin/api", tags=["admin"])
+
+
+def _is_phase_step(text: Any) -> bool:
+    return bool(re.match(r"(?i)^\s*phase\s*\d+\s*:", str(text or "").strip()))
+
+
+TREATED_MARK = "[TREATED]"
+
+
+def booking_is_treated(row: dict) -> bool:
+    """True when visit is treated history (column or note marker fallback)."""
+    if "treated" in row and row.get("treated") is not None:
+        return bool(row.get("treated"))
+    note = str(row.get("note") or "")
+    return note.lstrip().upper().startswith(TREATED_MARK)
+
+
+def treated_note_value(current_note: Any, treated: bool) -> Optional[str]:
+    note = str(current_note or "")
+    stripped = re.sub(r"(?i)^\s*\[TREATED\]\s*", "", note).strip()
+    if treated:
+        return f"{TREATED_MARK}\n{stripped}".strip() if stripped else TREATED_MARK
+    return stripped or None
+
+
+def _assessment_lookup_maps(assessments: list[dict]) -> tuple[dict[str, str], dict[str, str]]:
+    """Map normalized email/phone → latest assessment id."""
+    by_email: dict[str, tuple[str, str]] = {}
+    by_phone: dict[str, tuple[str, str]] = {}
+    for row in assessments:
+        aid = str(row.get("id") or "").strip()
+        if not aid:
+            continue
+        created = str(row.get("created_at") or "")
+        email_n = normalize_email(row.get("email") or "")
+        phone_n = normalize_phone(row.get("phone") or "")
+        if email_n:
+            prev = by_email.get(email_n)
+            if not prev or created >= prev[0]:
+                by_email[email_n] = (created, aid)
+        if phone_n:
+            prev = by_phone.get(phone_n)
+            if not prev or created >= prev[0]:
+                by_phone[phone_n] = (created, aid)
+    return (
+        {k: v[1] for k, v in by_email.items()},
+        {k: v[1] for k, v in by_phone.items()},
+    )
+
+
+def resolve_booking_assessment_id(
+    booking: dict,
+    *,
+    by_email: dict[str, str],
+    by_phone: dict[str, str],
+) -> Optional[str]:
+    existing = str(booking.get("assessment_id") or "").strip()
+    if existing:
+        return existing
+    email_n = normalize_email(booking.get("email") or "")
+    phone_n = normalize_phone(booking.get("phone") or "")
+    if email_n and email_n in by_email:
+        return by_email[email_n]
+    if phone_n and phone_n in by_phone:
+        return by_phone[phone_n]
+    return None
 
 
 class LoginBody(BaseModel):
@@ -45,6 +113,7 @@ class BookingCreate(BaseModel):
 
 class BookingPatch(BaseModel):
     status: Optional[Literal["confirmed", "cancelled"]] = None
+    treated: Optional[bool] = None
     date: Optional[str] = None
     time: Optional[str] = None
     note: Optional[str] = None
@@ -60,6 +129,10 @@ class ScheduleBody(BaseModel):
     close_time: str = "20:00"
     slot_minutes: int = Field(default=30, ge=5, le=120)
     active: bool = True
+
+
+class ScheduleActiveBody(BaseModel):
+    active: bool
 
 
 def _require_db():
@@ -235,6 +308,14 @@ def persist_assessment(
     data = (res.data or [None])[0]
     if not data:
         return None
+
+    try:
+        photo_paths = upload_assessment_photos(str(data["id"]), images)
+        if photo_paths:
+            sb.table("assessments").update(photo_paths).eq("id", data["id"]).execute()
+            data.update(photo_paths)
+    except Exception:
+        logger.exception("Assessment photo upload failed")
 
     sent = send_assessment_email(
         to_email=email_n,
@@ -455,21 +536,109 @@ def admin_login(body: LoginBody):
 @admin_router.get("/stats")
 def admin_stats(_: str = Depends(require_admin)):
     _require_db()
-    sb = get_supabase()
-    assessments = (
-        sb.table("assessments")
-        .select("overall_score,concerns,treatments")
-        .execute()
-    ).data or []
-    bookings = (
-        sb.table("bookings")
-        .select("id,status,date")
-        .eq("status", "confirmed")
-        .execute()
-    ).data or []
+
+    def _load():
+        sb = get_supabase()
+        assessments = (
+            sb.table("assessments")
+            .select("id,overall_score,concerns,treatments,email,phone,created_at")
+            .execute()
+        ).data or []
+        bookings = (
+            sb.table("bookings")
+            .select("id,status,name,email,phone,date,time,note,source,assessment_id")
+            .execute()
+        ).data or []
+        return assessments, bookings
+
+    try:
+        assessments, bookings = db_retry(_load, label="admin stats")
+    except Exception:
+        logger.exception("Admin stats failed")
+        raise HTTPException(status_code=503, detail="Could not load dashboard stats. Please try again.")
 
     scores = [r["overall_score"] for r in assessments if isinstance(r.get("overall_score"), (int, float))]
     avg_score = round(sum(scores) / len(scores), 1) if scores else None
+
+    buckets = [
+        {"key": "attention", "label": "0–74", "hint": "Attention", "min": 0, "max": 74, "count": 0},
+        {"key": "watch", "label": "75–89", "hint": "Watch", "min": 75, "max": 89, "count": 0},
+        {"key": "good", "label": "90–100", "hint": "Good", "min": 90, "max": 100, "count": 0},
+    ]
+    for score in scores:
+        for b in buckets:
+            if b["min"] <= float(score) <= b["max"]:
+                b["count"] += 1
+                break
+
+    confirmed = [
+        b
+        for b in bookings
+        if b.get("status") == "confirmed" and not booking_is_treated(b)
+    ]
+    cancelled = sum(1 for b in bookings if b.get("status") == "cancelled")
+    today = date_cls.today().isoformat()
+    today_dt = date_cls.today()
+
+    def _pct_change(current: int, previous: int) -> Optional[int]:
+        if previous <= 0:
+            return 100 if current > 0 else 0
+        return int(round(((current - previous) / previous) * 100))
+
+    def _in_range(day: Optional[date_cls], start: date_cls, end: date_cls) -> bool:
+        return bool(day and start <= day <= end)
+
+    week_start = today_dt.fromordinal(today_dt.toordinal() - 6)
+    prev_week_end = week_start.fromordinal(week_start.toordinal() - 1)
+    prev_week_start = prev_week_end.fromordinal(prev_week_end.toordinal() - 6)
+
+    def _parse_day(raw: Any) -> Optional[date_cls]:
+        text = str(raw or "")[:10]
+        if len(text) < 10:
+            return None
+        try:
+            return date_cls.fromisoformat(text)
+        except ValueError:
+            return None
+
+    bookings_week = sum(
+        1 for b in confirmed if _in_range(_parse_day(b.get("date")), week_start, today_dt)
+    )
+    bookings_prev = sum(
+        1
+        for b in confirmed
+        if _in_range(_parse_day(b.get("date")), prev_week_start, prev_week_end)
+    )
+    tests_week = sum(
+        1
+        for row in assessments
+        if _in_range(_parse_day(row.get("created_at")), week_start, today_dt)
+    )
+    tests_prev = sum(
+        1
+        for row in assessments
+        if _in_range(_parse_day(row.get("created_at")), prev_week_start, prev_week_end)
+    )
+    booking_change_pct = _pct_change(bookings_week, bookings_prev)
+    assessment_change_pct = _pct_change(tests_week, tests_prev)
+
+    today_visits = sorted(
+        [b for b in confirmed if str(b.get("date") or "") == today],
+        key=lambda b: str(b.get("time") or ""),
+    )
+    upcoming = sorted(
+        [b for b in confirmed if str(b.get("date") or "") >= today],
+        key=lambda b: (str(b.get("date") or ""), str(b.get("time") or "")),
+    )[:12]
+
+    month_prefix = today[:7]  # YYYY-MM
+    calendar_days = sorted(
+        {
+            str(b.get("date"))
+            for b in confirmed
+            if str(b.get("date") or "").startswith(month_prefix)
+        }
+    )
 
     concern_counts: dict[str, int] = {}
     treatment_counts: dict[str, int] = {}
@@ -477,17 +646,49 @@ def admin_stats(_: str = Depends(require_admin)):
         for c in row.get("concerns") or []:
             concern_counts[c] = concern_counts.get(c, 0) + 1
         for t in row.get("treatments") or []:
+            if _is_phase_step(t):
+                continue
             treatment_counts[t] = treatment_counts.get(t, 0) + 1
 
-    top_concerns = sorted(concern_counts.items(), key=lambda x: (-x[1], x[0]))[:12]
-    top_treatments = sorted(treatment_counts.items(), key=lambda x: (-x[1], x[0]))[:12]
+    top_concerns = sorted(concern_counts.items(), key=lambda x: (-x[1], x[0]))[:10]
+    top_treatments = sorted(treatment_counts.items(), key=lambda x: (-x[1], x[0]))[:10]
+
+    by_email, by_phone = _assessment_lookup_maps(assessments)
+
+    def _booking_public(b: dict) -> dict:
+        return {
+            "id": b.get("id"),
+            "name": b.get("name"),
+            "email": b.get("email"),
+            "phone": b.get("phone"),
+            "date": b.get("date"),
+            "time": str(b.get("time") or "")[:5],
+            "note": b.get("note"),
+            "source": b.get("source"),
+            "status": b.get("status"),
+            "assessment_id": resolve_booking_assessment_id(
+                b, by_email=by_email, by_phone=by_phone
+            ),
+        }
 
     return {
         "assessment_count": len(assessments),
-        "booking_count": len(bookings),
+        "booking_count": len(confirmed),
+        "cancelled_count": cancelled,
+        "today_count": len(today_visits),
+        "booking_change_pct": booking_change_pct,
+        "assessment_change_pct": assessment_change_pct,
         "avg_smile_score": avg_score,
+        "score_distribution": [
+            {"key": b["key"], "label": b["label"], "hint": b["hint"], "count": b["count"]}
+            for b in buckets
+        ],
         "top_concerns": [{"label": k, "count": v} for k, v in top_concerns],
         "top_treatments": [{"label": k, "count": v} for k, v in top_treatments],
+        "today_visits": [_booking_public(b) for b in today_visits],
+        "upcoming": [_booking_public(b) for b in upcoming],
+        "calendar_days": calendar_days,
+        "calendar_month": month_prefix,
     }
 
 
@@ -502,14 +703,26 @@ def admin_reports(
     limit: int = Query(100, ge=1, le=500),
 ):
     _require_db()
-    sb = get_supabase()
-    query = sb.table("assessments").select(
-        "id,email,phone,overall_score,concerns,treatments,email_sent_at,created_at"
-    )
     ascending = order.lower() == "asc"
     sort_col = sort if sort in {"created_at", "overall_score", "email"} else "created_at"
-    query = query.order(sort_col, desc=not ascending).limit(limit)
-    rows = list((query.execute()).data or [])
+
+    def _fetch():
+        sb = get_supabase()
+        query = sb.table("assessments").select(
+            "id,email,phone,overall_score,concerns,treatments,email_sent_at,created_at,"
+            "photo_front_path,bookings(name,created_at,status,date,time)"
+        )
+        query = query.order(sort_col, desc=not ascending).limit(limit)
+        return list((query.execute()).data or [])
+
+    try:
+        rows = db_retry(_fetch, label="admin reports")
+    except Exception:
+        logger.exception("Admin reports list failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Could not load assessments. Please try again.",
+        )
 
     qn = q.strip().lower()
     filtered = []
@@ -518,29 +731,125 @@ def admin_reports(
             continue
         if max_score is not None and (row.get("overall_score") is None or row["overall_score"] > max_score):
             continue
+
+        bookings = row.pop("bookings", None) or []
+        if not isinstance(bookings, list):
+            bookings = []
+
+        def _booking_rank(b: dict) -> tuple:
+            created = str(b.get("created_at") or "")
+            try:
+                ts = datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                ts = 0.0
+            # Confirmed first, then newest
+            return (0 if b.get("status") == "confirmed" else 1, -ts)
+
+        name = ""
+        appointment_date = None
+        appointment_time = None
+        booking_rows = sorted(
+            [b for b in bookings if isinstance(b, dict)],
+            key=_booking_rank,
+        )
+        for booking in booking_rows:
+            candidate = str(booking.get("name") or "").strip()
+            if candidate and not name:
+                name = candidate
+        # Prefer confirmed with a date, then any booking with a date.
+        for booking in booking_rows:
+            day = str(booking.get("date") or "").strip() or None
+            slot = str(booking.get("time") or "").strip() or None
+            if not day:
+                continue
+            if booking.get("status") == "confirmed":
+                appointment_date, appointment_time = day, slot
+                break
+            if appointment_date is None:
+                appointment_date, appointment_time = day, slot
+
+        front_path = str(row.get("photo_front_path") or "").strip()
+        item = {
+            "id": row.get("id"),
+            "email": row.get("email"),
+            "phone": row.get("phone"),
+            "name": name or None,
+            "overall_score": row.get("overall_score"),
+            "concerns": row.get("concerns") or [],
+            "treatments": row.get("treatments") or [],
+            "email_sent_at": row.get("email_sent_at"),
+            "created_at": row.get("created_at"),
+            "appointment_date": appointment_date,
+            "appointment_time": appointment_time,
+            "photo_front_url": signed_url_for_path(front_path) if front_path else None,
+        }
+
         if qn:
-            blob = f"{row.get('email','')} {row.get('phone','')} {' '.join(row.get('concerns') or [])}".lower()
+            blob = (
+                f"{item.get('name') or ''} {item.get('email') or ''} "
+                f"{item.get('phone') or ''} {' '.join(item.get('concerns') or [])}"
+            ).lower()
             if qn not in blob:
                 continue
-        filtered.append(row)
+        filtered.append(item)
     return {"items": filtered}
 
 
 @admin_router.get("/reports/{report_id}")
 def admin_report_detail(report_id: str, _: str = Depends(require_admin)):
     _require_db()
-    sb = get_supabase()
-    res = sb.table("assessments").select("*").eq("id", report_id).limit(1).execute()
+
+    def _load_report():
+        sb = get_supabase()
+        return sb.table("assessments").select("*").eq("id", report_id).limit(1).execute()
+
+    def _load_bookings():
+        sb = get_supabase()
+        by_id = (
+            sb.table("bookings")
+            .select("*")
+            .eq("assessment_id", report_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        rows = list(by_id.data or [])
+        if rows:
+            return by_id
+        # Fallback: match by patient email/phone when assessment_id was never stored.
+        email_n = normalize_email((report or {}).get("email") or "")
+        phone_n = normalize_phone((report or {}).get("phone") or "")
+        query = sb.table("bookings").select("*").order("created_at", desc=True).limit(20)
+        # Prefer email match when available.
+        if email_n:
+            return query.eq("email", email_n).execute()
+        if phone_n:
+            return query.eq("phone", phone_n).execute()
+        return by_id
+
+    try:
+        res = db_retry(_load_report, label="admin report detail")
+    except Exception:
+        logger.exception("Admin report detail failed for %s", report_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Could not load assessment. Please try again.",
+        )
     if not res.data:
         raise HTTPException(status_code=404, detail="Report not found.")
-    bookings = (
-        sb.table("bookings")
-        .select("*")
-        .eq("assessment_id", report_id)
-        .order("created_at", desc=True)
-        .execute()
-    ).data or []
-    return {"report": res.data[0], "bookings": bookings}
+    report = res.data[0]
+
+    bookings = []
+    try:
+        bookings = list(db_retry(_load_bookings, label="admin report bookings").data or [])
+    except Exception:
+        logger.exception("Admin report bookings failed for %s", report_id)
+
+    photos = {}
+    try:
+        photos = signed_photo_urls(report)
+    except Exception:
+        logger.exception("Could not build signed photo URLs")
+    return {"report": report, "bookings": bookings, "photos": photos}
 
 
 @admin_router.get("/bookings")
@@ -559,8 +868,11 @@ def admin_bookings(
     def _fetch():
         sb = get_supabase()
         query = sb.table("bookings").select("*")
-        if status in {"confirmed", "cancelled"}:
-            query = query.eq("status", status)
+        if status == "cancelled":
+            query = query.eq("status", "cancelled")
+        elif status in {"confirmed", "treated"}:
+            # Subsets of confirmed; treated uses column or [TREATED] note marker.
+            query = query.eq("status", "confirmed")
         query = query.order(sort_col, desc=not ascending).limit(limit)
         return query.execute()
 
@@ -572,6 +884,14 @@ def admin_bookings(
             status_code=503,
             detail="Could not load appointments. Please try again.",
         )
+
+    if status == "confirmed":
+        rows = [r for r in rows if not booking_is_treated(r)]
+    elif status == "treated":
+        rows = [r for r in rows if booking_is_treated(r)]
+    for r in rows:
+        r["treated"] = booking_is_treated(r)
+
     qn = q.strip().lower()
     if qn:
         rows = [
@@ -580,6 +900,25 @@ def admin_bookings(
             if qn
             in f"{r.get('name','')} {r.get('email','')} {r.get('phone','')} {r.get('date','')} {r.get('time','')}".lower()
         ]
+
+    # Link bookings to assessments by email/phone when assessment_id is missing.
+    try:
+        sb = get_supabase()
+        assessments = (
+            sb.table("assessments")
+            .select("id,email,phone,created_at")
+            .execute()
+        ).data or []
+        by_email, by_phone = _assessment_lookup_maps(assessments)
+        for row in rows:
+            linked = resolve_booking_assessment_id(
+                row, by_email=by_email, by_phone=by_phone
+            )
+            if linked:
+                row["assessment_id"] = linked
+    except Exception:
+        logger.exception("Could not link bookings to assessments")
+
     return {"items": rows}
 
 
@@ -607,15 +946,22 @@ def admin_patch_booking(
     if body.time is not None:
         updates["time"] = parse_time_input(body.time)
 
+    sb = get_supabase()
+    current = (
+        sb.table("bookings").select("*").eq("id", booking_id).limit(1).execute()
+    ).data
+    if not current:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    cur = current[0]
+
+    if body.treated is not None:
+        updates["treated"] = bool(body.treated)
+        # Keep note marker in sync so Treated history works before/without the column.
+        if body.note is None:
+            updates["note"] = treated_note_value(cur.get("note"), bool(body.treated))
+
     if body.date is not None or body.time is not None:
         # Validate new slot availability (ignore this booking itself).
-        sb = get_supabase()
-        current = (
-            sb.table("bookings").select("*").eq("id", booking_id).limit(1).execute()
-        ).data
-        if not current:
-            raise HTTPException(status_code=404, detail="Booking not found.")
-        cur = current[0]
         day = updates.get("date") or cur["date"]
         slot = updates.get("time") or (str(cur["time"])[:5])
         schedules = fetch_schedules()
@@ -631,17 +977,53 @@ def admin_patch_booking(
     if not updates:
         raise HTTPException(status_code=400, detail="No changes provided.")
 
-    sb = get_supabase()
     try:
         res = sb.table("bookings").update(updates).eq("id", booking_id).execute()
     except Exception as e:
         msg = str(e).lower()
-        if "duplicate" in msg or "unique" in msg:
+        if "treated" in updates and (
+            "treated" in msg or "42703" in msg or "column" in msg
+        ):
+            updates.pop("treated", None)
+            if not updates:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Could not update treated status. Apply migration 003_booking_treated.sql.",
+                ) from e
+            try:
+                res = sb.table("bookings").update(updates).eq("id", booking_id).execute()
+            except Exception as e2:
+                msg2 = str(e2).lower()
+                if "duplicate" in msg2 or "unique" in msg2:
+                    raise HTTPException(status_code=409, detail="Slot conflict.") from e2
+                raise
+        elif "duplicate" in msg or "unique" in msg:
             raise HTTPException(status_code=409, detail="Slot conflict.") from e
-        raise
+        else:
+            raise
     if not res.data:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    return res.data[0]
+    data = res.data[0]
+    data["treated"] = booking_is_treated(data)
+
+    becoming_cancelled = (
+        body.status == "cancelled" and str(cur.get("status") or "") != "cancelled"
+    )
+    if becoming_cancelled:
+        try:
+            sent = send_cancellation_email(
+                to_email=str(data.get("email") or cur.get("email") or ""),
+                name=str(data.get("name") or cur.get("name") or ""),
+                phone=str(data.get("phone") or cur.get("phone") or ""),
+                day=str(data.get("date") or cur.get("date") or ""),
+                time_slot=str(data.get("time") or cur.get("time") or "")[:5],
+            )
+            data["email_sent"] = bool(sent)
+        except Exception:
+            logger.exception("Cancellation email failed for booking %s", booking_id)
+            data["email_sent"] = False
+
+    return data
 
 
 @admin_router.get("/schedules")
@@ -689,6 +1071,25 @@ def admin_patch_schedule(
     }
     sb = get_supabase()
     res = sb.table("slot_schedules").update(row).eq("id", schedule_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Schedule not found.")
+    return res.data[0]
+
+
+@admin_router.patch("/schedules/{schedule_id}/active")
+def admin_set_schedule_active(
+    schedule_id: str,
+    body: ScheduleActiveBody,
+    _: str = Depends(require_admin),
+):
+    _require_db()
+    sb = get_supabase()
+    res = (
+        sb.table("slot_schedules")
+        .update({"active": body.active})
+        .eq("id", schedule_id)
+        .execute()
+    )
     if not res.data:
         raise HTTPException(status_code=404, detail="Schedule not found.")
     return res.data[0]

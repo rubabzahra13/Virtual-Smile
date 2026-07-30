@@ -52,7 +52,12 @@ def db_retry(fn: Callable[[], T], *, attempts: int = 3, label: str = "supabase")
             last = exc
             if not _is_transient_db_error(exc) or attempt >= attempts:
                 raise
-            delay = 0.2 * attempt
+            # Drop poisoned HTTP/2 connections before retrying.
+            try:
+                get_supabase.cache_clear()
+            except Exception:
+                pass
+            delay = 0.25 * attempt
             logger.warning(
                 "%s failed (attempt %s/%s): %s; retrying in %.1fs",
                 label,

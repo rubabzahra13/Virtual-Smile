@@ -127,258 +127,404 @@
 
       <!-- Top bar -->
       <header class="admin-topbar" role="banner">
-        <div class="topbar-left">
-          <p class="topbar-eyebrow" id="topbar-eyebrow">Operations</p>
-          <h2 class="top-title" id="top-title">Clinic Dashboard</h2>
+        <div class="topbar-left topbar-meta" id="topbar-meta">
+          <p class="topbar-eyebrow" id="topbar-eyebrow">Overview</p>
+          <h2 class="top-title" id="top-title">Welcome admin</h2>
           <p class="top-subtitle" id="top-subtitle">Live overview of assessments and appointments.</p>
         </div>
-        <div class="topbar-right"></div>
+        <div class="topbar-right">
+          <div class="topbar-notify-wrap" id="topbar-notify-wrap">
+            <button type="button" class="topbar-bell" id="topbar-bell" aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false" title="Notifications">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span class="topbar-bell-dot" id="topbar-bell-dot" hidden></span>
+            </button>
+            <div class="topbar-notify-panel" id="topbar-notify-panel" role="dialog" aria-label="Notifications" hidden>
+              <div class="topbar-notify-head">
+                <strong>Notifications</strong>
+                <button type="button" class="topbar-notify-clear" id="topbar-notify-clear">Mark all read</button>
+              </div>
+              <div class="topbar-notify-list" id="topbar-notify-list"></div>
+            </div>
+          </div>
+          <div class="topbar-avatar" id="topbar-avatar" aria-hidden="true">A</div>
+        </div>
       </header>
 
       <!-- Content -->
       <div class="admin-content">
 
         <!-- ── Dashboard panel ─────────────────────── -->
-        <section id="panel-dashboard" class="panel is-active" role="tabpanel" aria-labelledby="tab-dashboard">
+        <section id="panel-dashboard" class="panel dash-panel is-active" role="tabpanel" aria-labelledby="tab-dashboard">
+          <div class="clinic-dash">
+            <div class="clinic-main">
+              <article class="clinic-hero">
+                <div class="clinic-hero-copy">
+                  <p class="clinic-hero-label">Today’s patient visits</p>
+                  <div class="clinic-hero-value">
+                    <strong id="dash-today-count">—</strong>
+                    <span>/visits</span>
+                  </div>
+                  <div class="clinic-hero-pills">
+                    <div class="clinic-pill tone-blue">
+                      <span class="clinic-pill-label">Bookings</span>
+                      <div class="clinic-pill-row">
+                        <strong id="dash-booking-count">—</strong>
+                        <span class="clinic-pill-trend is-up" id="dash-booking-trend">
+                          <span class="clinic-pill-trend-pct">0%</span>
+                          <svg class="clinic-pill-trend-icon" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 9.5 5.2 5.8 8.1 8.2 14.5 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.2 2.2H14.5V5.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="clinic-pill tone-teal">
+                      <span class="clinic-pill-label">Tests</span>
+                      <div class="clinic-pill-row">
+                        <strong id="dash-test-count">—</strong>
+                        <span class="clinic-pill-trend is-down" id="dash-test-trend">
+                          <span class="clinic-pill-trend-pct">0%</span>
+                          <svg class="clinic-pill-trend-icon" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 9.5 5.2 5.8 8.1 8.2 14.5 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.2 2.2H14.5V5.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="clinic-hero-art" aria-hidden="true">
+                  <img class="clinic-tooth-art" src="/static/assets/image.png" alt="" width="280" height="280" />
+                </div>
+              </article>
 
-          <!-- KPI grid -->
-          <div class="stat-grid" id="stat-grid">
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <span class="stat-label">Total Assessments</span>
-              <strong id="stat-assessments">—</strong>
-              <p class="stat-trend">AI smile reports completed</p>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </div>
-              <span class="stat-label">Total Bookings</span>
-              <strong id="stat-bookings">—</strong>
-              <p class="stat-trend">Confirmed appointments</p>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              </div>
-              <span class="stat-label">Avg Smile Score</span>
-              <strong id="stat-avg">—</strong>
-              <p class="stat-trend">Out of 100</p>
-            </div>
-          </div>
+              <div class="clinic-board clinic-card">
+                <div class="clinic-board-pane clinic-patients">
+                  <div class="clinic-card-head clinic-patients-head">
+                    <h3>Patient list</h3>
+                    <div class="clinic-filter-wrap" id="dash-filter-wrap">
+                      <button type="button" class="clinic-filter-btn" id="dash-filter-btn" aria-haspopup="listbox" aria-expanded="false">
+                        <span id="dash-filter-label">Today</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+                      </button>
+                      <div class="clinic-filter-menu" id="dash-filter-menu" role="listbox" hidden>
+                        <button type="button" class="clinic-filter-option is-active" role="option" data-value="today" aria-selected="true">Today</button>
+                        <button type="button" class="clinic-filter-option" role="option" data-value="upcoming" aria-selected="false">Upcoming</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="dash-patient-list" class="clinic-patient-list" role="list"></div>
+                </div>
 
-          <!-- Rank cards -->
-          <div class="split">
-            <div class="rank-card">
-              <div class="rank-card-header">
-                <h2>Top Concerns</h2>
-                <div class="rank-card-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <div class="clinic-board-divider" aria-hidden="true"></div>
+
+                <div class="clinic-board-pane clinic-brief" id="dash-brief">
+                  <div class="clinic-card-head">
+                    <h3>Day brief</h3>
+                    <span class="clinic-brief-scope" id="dash-brief-scope"></span>
+                  </div>
+                  <div id="dash-brief-body" class="clinic-brief-body">
+                    <p class="clinic-empty">Loading schedule…</p>
+                  </div>
                 </div>
               </div>
-              <ul id="top-concerns" class="rank-list" aria-label="Top concerns"></ul>
             </div>
-            <div class="rank-card">
-              <div class="rank-card-header">
-                <h2>Top Treatments</h2>
-                <div class="rank-card-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+
+            <aside class="clinic-side">
+              <section class="clinic-card clinic-concerns">
+                <div class="clinic-card-head">
+                  <h3>Top concerns</h3>
+                  <span class="clinic-concerns-total" id="dash-concerns-total"></span>
                 </div>
-              </div>
-              <ul id="top-treatments" class="rank-list" aria-label="Top treatments"></ul>
-            </div>
+                <div id="dash-concerns-chart" class="concerns-chart" aria-label="Top concerns chart"></div>
+              </section>
+
+              <section class="clinic-card clinic-pulse">
+                <div class="clinic-card-head">
+                  <h3>Clinic pulse</h3>
+                  <span class="clinic-avg" id="dash-avg-score">—</span>
+                </div>
+                <div id="dash-score-mix" class="dash-mix" aria-label="Score mix"></div>
+              </section>
+            </aside>
           </div>
         </section>
 
         <!-- ── Reports panel ───────────────────────── -->
-        <section id="panel-reports" class="panel" role="tabpanel" aria-labelledby="tab-reports" hidden>
+        <section id="panel-reports" class="panel panel-reports" role="tabpanel" aria-labelledby="tab-reports" hidden>
 
-          <div class="toolbar">
-            <div class="toolbar-search-wrap">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="search" id="reports-q" placeholder="Search email, phone, concern…" aria-label="Search reports" />
+          <div class="toolbar reports-toolbar">
+            <div class="reports-toolbar-top">
+              <div class="toolbar-search-wrap reports-search">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="search" id="reports-q" placeholder="Search name, email, or phone" aria-label="Search reports" />
+              </div>
+              <div class="reports-sort-wrap" id="reports-sort-wrap">
+                <span class="reports-sort-label" id="reports-sort-label">Sort</span>
+                <button type="button" class="reports-sort-btn" id="reports-sort-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="reports-sort-label reports-sort-btn">
+                  <span id="reports-sort-btn-label">Newest first</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+                </button>
+                <div class="reports-sort-menu" id="reports-sort-menu" role="listbox" hidden>
+                  <button type="button" class="reports-sort-option is-active" role="option" data-value="created_at:desc" aria-selected="true">Newest first</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="created_at:asc" aria-selected="false">Oldest first</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="email:asc" aria-selected="false">Name A–Z</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="email:desc" aria-selected="false">Name Z–A</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="overall_score:desc" aria-selected="false">Highest score</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="overall_score:asc" aria-selected="false">Lowest score</button>
+                </div>
+                <select id="reports-sort" aria-hidden="true" tabindex="-1" hidden>
+                  <option value="created_at:desc" selected>Newest first</option>
+                  <option value="created_at:asc">Oldest first</option>
+                  <option value="email:asc">Name A–Z</option>
+                  <option value="email:desc">Name Z–A</option>
+                  <option value="overall_score:desc">Highest score</option>
+                  <option value="overall_score:asc">Lowest score</option>
+                </select>
+              </div>
             </div>
-            <div class="toolbar-filters">
-              <select id="reports-sort" aria-label="Sort reports">
-                <option value="created_at:desc">Newest first</option>
-                <option value="created_at:asc">Oldest first</option>
-                <option value="overall_score:desc">Score high → low</option>
-                <option value="overall_score:asc">Score low → high</option>
-              </select>
-              <input type="number" id="reports-min" placeholder="Min score" min="0" max="100" aria-label="Minimum score" style="max-width:110px" />
-              <input type="number" id="reports-max" placeholder="Max score" min="0" max="100" aria-label="Maximum score" style="max-width:110px" />
+            <div class="reports-filter-row">
+              <div class="reports-chips" role="group" aria-label="Filter by status">
+                <button type="button" class="reports-chip is-active" data-reports-band="all">All</button>
+                <button type="button" class="reports-chip" data-reports-band="good">Good</button>
+                <button type="button" class="reports-chip" data-reports-band="watch">Watch</button>
+                <button type="button" class="reports-chip" data-reports-band="attention">Attention</button>
+              </div>
+              <div class="reports-chips" role="group" aria-label="Filter by date">
+                <button type="button" class="reports-chip is-active" data-reports-date="all">Any time</button>
+                <button type="button" class="reports-chip" data-reports-date="today">Today</button>
+                <button type="button" class="reports-chip" data-reports-date="7d">7 days</button>
+                <button type="button" class="reports-chip" data-reports-date="30d">30 days</button>
+              </div>
             </div>
+            <input type="hidden" id="reports-band" value="all" />
+            <input type="hidden" id="reports-date" value="all" />
           </div>
 
-          <div id="reports-list" class="data-list" role="list"></div>
+          <div class="reports-sheet">
+            <div class="reports-sheet-head" aria-hidden="true">
+              <span class="reports-col reports-col-index">#</span>
+              <span class="reports-col reports-col-identity">Patient</span>
+              <span class="reports-col reports-col-score">Score</span>
+              <span class="reports-col reports-col-concerns">Concerns</span>
+              <span class="reports-col reports-col-appt">Appointment</span>
+              <span class="reports-col reports-col-date">Submitted</span>
+              <span class="reports-col reports-col-action"></span>
+            </div>
+            <div id="reports-list" class="reports-list" role="list"></div>
+            <div class="sheet-pager" id="reports-pager" hidden>
+              <span class="sheet-pager-meta" id="reports-pager-meta"></span>
+              <div class="sheet-pager-controls">
+                <button type="button" class="sheet-pager-nav" id="reports-pager-prev" data-pager="reports" data-dir="prev" aria-label="Previous page">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div class="sheet-pager-pages" id="reports-pager-pages" role="group" aria-label="Pages"></div>
+                <button type="button" class="sheet-pager-nav" id="reports-pager-next" data-pager="reports" data-dir="next" aria-label="Next page">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- ── Appointments panel ──────────────────── -->
-        <section id="panel-appointments" class="panel" role="tabpanel" aria-labelledby="tab-appointments" hidden>
+        <section id="panel-appointments" class="panel panel-appointments" role="tabpanel" aria-labelledby="tab-appointments" hidden>
 
-          <div class="toolbar">
-            <div class="toolbar-search-wrap">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="search" id="bookings-q" placeholder="Search name, email, phone, date…" aria-label="Search appointments" />
+          <div class="toolbar reports-toolbar bookings-toolbar">
+            <div class="reports-toolbar-top">
+              <div class="toolbar-search-wrap reports-search">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="search" id="bookings-q" placeholder="Search name, email, or phone" aria-label="Search appointments" />
+              </div>
+              <div class="reports-sort-wrap" id="bookings-sort-wrap">
+                <span class="reports-sort-label" id="bookings-sort-label">Sort</span>
+                <button type="button" class="reports-sort-btn" id="bookings-sort-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="bookings-sort-label bookings-sort-btn">
+                  <span id="bookings-sort-btn-label">Date newest</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+                </button>
+                <div class="reports-sort-menu" id="bookings-sort-menu" role="listbox" hidden>
+                  <button type="button" class="reports-sort-option is-active" role="option" data-value="date:desc" aria-selected="true">Date newest</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="date:asc" aria-selected="false">Date oldest</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="created_at:desc" aria-selected="false">Booked newest</button>
+                  <button type="button" class="reports-sort-option" role="option" data-value="name:asc" aria-selected="false">Name A–Z</button>
+                </div>
+                <select id="bookings-sort" aria-hidden="true" tabindex="-1" hidden>
+                  <option value="date:desc" selected>Date newest</option>
+                  <option value="date:asc">Date oldest</option>
+                  <option value="created_at:desc">Booked newest</option>
+                  <option value="name:asc">Name A–Z</option>
+                </select>
+              </div>
             </div>
-            <div class="toolbar-filters">
-              <select id="bookings-sort" aria-label="Sort appointments">
-                <option value="date:desc">Date newest</option>
-                <option value="date:asc">Date oldest</option>
-                <option value="created_at:desc">Booked newest</option>
-                <option value="name:asc">Name A-Z</option>
-              </select>
-              <select id="bookings-status" aria-label="Filter by status">
-                <option value="confirmed">Confirmed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+            <div class="reports-filter-row">
+              <div class="reports-chips" role="group" aria-label="Filter by status">
+                <button type="button" class="reports-chip is-active" data-bookings-status="confirmed">Confirmed</button>
+                <button type="button" class="reports-chip" data-bookings-status="treated">Treated</button>
+                <button type="button" class="reports-chip" data-bookings-status="cancelled">Cancelled</button>
+              </div>
             </div>
+            <input type="hidden" id="bookings-status" value="confirmed" />
           </div>
 
-          <div id="bookings-list" class="data-list" role="list"></div>
+          <div class="bookings-sheet">
+            <div class="bookings-sheet-head" aria-hidden="true">
+              <span class="bookings-col bookings-col-index">#</span>
+              <span class="bookings-col bookings-col-patient">Patient</span>
+              <span class="bookings-col bookings-col-source">Source</span>
+              <span class="bookings-col bookings-col-status">Status</span>
+              <span class="bookings-col bookings-col-when">Booked</span>
+              <span class="bookings-col bookings-col-action">Actions</span>
+            </div>
+            <div id="bookings-list" class="bookings-list" role="list"></div>
+            <div class="sheet-pager" id="bookings-pager" hidden>
+              <span class="sheet-pager-meta" id="bookings-pager-meta"></span>
+              <div class="sheet-pager-controls">
+                <button type="button" class="sheet-pager-nav" id="bookings-pager-prev" data-pager="bookings" data-dir="prev" aria-label="Previous page">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div class="sheet-pager-pages" id="bookings-pager-pages" role="group" aria-label="Pages"></div>
+                <button type="button" class="sheet-pager-nav" id="bookings-pager-next" data-pager="bookings" data-dir="next" aria-label="Next page">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- ── New Booking panel ───────────────────── -->
-        <section id="panel-book" class="panel" role="tabpanel" aria-labelledby="tab-book" hidden>
-          <div class="section-card">
-            <div class="section-card-header">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-              <h2>Book an in-person visit</h2>
-            </div>
-            <div class="section-card-body">
-              <p class="section-card-lead" style="margin-bottom:1.5rem">Create a manual appointment for walk-in patients or those who contacted the clinic directly.</p>
+        <section id="panel-book" class="panel book-panel" role="tabpanel" aria-labelledby="tab-book" hidden>
+          <form id="walkin-form" class="book-studio">
+            <div class="book-studio-left">
+              <div class="field">
+                <label for="w-name" class="field-label">Full name</label>
+                <input id="w-name" type="text" placeholder="e.g. Sarah Ahmed" required autocomplete="name" />
+                <input type="hidden" id="w-assessment-id" value="" />
+              </div>
+              <div class="field">
+                <label for="w-phone" class="field-label">Mobile phone</label>
+                <input id="w-phone" type="tel" placeholder="+92 300 000 0000" required autocomplete="tel" />
+              </div>
+              <div class="field">
+                <label for="w-email" class="field-label">Email</label>
+                <input id="w-email" type="email" placeholder="patient@email.com" required autocomplete="email" />
+              </div>
+              <div class="field">
+                <label for="w-note" class="field-label">Details <span class="field-optional">(optional)</span></label>
+                <textarea id="w-note" placeholder="Any notes about the visit…" rows="4"></textarea>
+              </div>
 
-              <form id="walkin-form" class="stack-form">
-
-                <div class="form-section">
-                  <p class="form-section-title">Patient information</p>
-                  <div class="field">
-                    <label for="w-name" class="field-label">Full name</label>
-                    <input id="w-name" type="text" placeholder="e.g. Sarah Ahmed" required autocomplete="name" />
-                  </div>
-                  <div class="form-grid-2">
-                    <div class="field">
-                      <label for="w-email" class="field-label">Email address</label>
-                      <input id="w-email" type="email" placeholder="patient@email.com" required autocomplete="email" />
-                    </div>
-                    <div class="field">
-                      <label for="w-phone" class="field-label">Phone number</label>
-                      <input id="w-phone" type="tel" placeholder="+92 300 000 0000" required autocomplete="tel" />
-                    </div>
-                  </div>
+              <div class="book-studio-actions">
+                <div class="book-selected-bar" id="w-selected-bar">
+                  <span class="book-selected-label">Currently selected:</span>
+                  <span class="book-selected-value" id="w-selected-value">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="w-selected-text">Pick a date and time</span>
+                  </span>
                 </div>
-
-                <div class="form-section">
-                  <p class="form-section-title">Appointment details</p>
-                  <div class="form-grid-2">
-                    <div class="field">
-                      <label for="w-date" class="field-label">Date</label>
-                      <input id="w-date" type="date" required />
-                    </div>
-                    <div class="field">
-                      <label for="w-time" class="field-label">Time</label>
-                      <select id="w-time" required disabled>
-                        <option value="">Select a date first</option>
-                      </select>
-                    </div>
-                  </div>
-                  <p id="w-slots-hint" class="stat-trend" style="margin-bottom:0.85rem;font-size:0.8rem;color:var(--teal-dark)"></p>
-                  <div class="field">
-                    <label for="w-note" class="field-label">Notes (optional)</label>
-                    <textarea id="w-note" placeholder="Any relevant notes about the visit…" rows="3"></textarea>
-                  </div>
-                </div>
-
                 <p id="walkin-status" class="status" role="status"></p>
-                <button type="submit" class="btn btn-teal" style="width:auto;padding:0.72rem 1.8rem">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                  Confirm booking
-                </button>
-              </form>
+                <button type="submit" class="btn btn-teal book-confirm-btn">Confirm booking</button>
+              </div>
             </div>
-          </div>
+
+            <div class="book-studio-right">
+              <div class="book-schedule-card">
+                <div class="book-schedule-head">
+                  <h3>Select date and time</h3>
+                  <div class="book-month-nav" aria-label="Month and year">
+                    <label class="visually-hidden" for="w-month">Month</label>
+                    <select id="w-month" class="book-month-select" aria-label="Month"></select>
+                    <label class="visually-hidden" for="w-year">Year</label>
+                    <select id="w-year" class="book-year-select" aria-label="Year"></select>
+                  </div>
+                </div>
+
+                <div class="book-calendar" id="w-calendar">
+                  <div class="book-cal-weekdays" aria-hidden="true">
+                    <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+                  </div>
+                  <div class="book-cal-grid" id="w-cal-grid" role="listbox" aria-label="Choose a date"></div>
+                </div>
+                <input id="w-date" type="hidden" required />
+
+                <div class="book-slot-grid" id="w-slot-grid" role="listbox" aria-label="Available times"></div>
+                <input id="w-time" type="hidden" required />
+                <p id="w-slots-hint" class="book-slots-hint"></p>
+              </div>
+            </div>
+          </form>
         </section>
 
         <!-- ── Clinic Hours panel ──────────────────── -->
-        <section id="panel-hours" class="panel" role="tabpanel" aria-labelledby="tab-hours" hidden>
+        <section id="panel-hours" class="panel hours-panel" role="tabpanel" aria-labelledby="tab-hours" hidden>
+          <div class="hours-studio">
+            <form id="schedule-form" class="hours-studio-form">
+              <div class="field">
+                <label for="s-label" class="field-label">Schedule name</label>
+                <input id="s-label" type="text" required placeholder="e.g. Ramadan hours" autocomplete="off" />
+              </div>
 
-          <div class="section-card" style="margin-bottom:1rem">
-            <div class="section-card-header">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <h2>Current Schedules</h2>
-            </div>
-            <div class="section-card-body">
-              <div id="schedules-list" class="data-list" role="list"></div>
-            </div>
-          </div>
-
-          <div class="section-card">
-            <div class="section-card-header">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-              <h2>Add a schedule</h2>
-            </div>
-            <div class="section-card-body">
-              <p class="section-card-lead" style="margin-bottom:1.5rem">Set opening hours for a date range. Useful for Ramadan, holidays, or seasonal changes.</p>
-
-              <form id="schedule-form" class="stack-form">
+              <div class="form-grid-2">
                 <div class="field">
-                  <label for="s-label" class="field-label">Schedule name</label>
-                  <input id="s-label" type="text" required placeholder="e.g. Ramadan hours" />
-                </div>
-
-                <div class="form-grid-2">
-                  <div class="field">
-                    <label for="s-start" class="field-label">Start date</label>
-                    <input id="s-start" type="date" required />
-                  </div>
-                  <div class="field">
-                    <label for="s-end" class="field-label">End date</label>
-                    <input id="s-end" type="date" required />
+                  <label for="s-start" class="field-label">Start date</label>
+                  <div class="picker-field">
+                    <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <input id="s-start" class="picker-input" type="date" required />
                   </div>
                 </div>
-
-                <fieldset class="days-fieldset">
-                  <legend>Open days</legend>
-                  <div class="days-row">
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="1" checked /> Mon</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="2" checked /> Tue</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="3" checked /> Wed</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="4" checked /> Thu</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="5" checked /> Fri</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="6" checked /> Sat</label>
-                    <label class="day-chip"><input type="checkbox" name="s-dow" value="0" /> Sun</label>
-                  </div>
-                </fieldset>
-
-                <div class="form-grid-2">
-                  <div class="field">
-                    <label for="s-open" class="field-label">Open time</label>
-                    <input id="s-open" type="time" value="09:00" required />
-                  </div>
-                  <div class="field">
-                    <label for="s-close" class="field-label">Close time</label>
-                    <input id="s-close" type="time" value="20:00" required />
-                  </div>
-                </div>
-
                 <div class="field">
-                  <label for="s-step" class="field-label">Slot duration (minutes)</label>
-                  <input id="s-step" type="number" value="30" min="5" max="120" style="max-width:140px" />
+                  <label for="s-end" class="field-label">End date</label>
+                  <div class="picker-field">
+                    <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <input id="s-end" class="picker-input" type="date" required />
+                  </div>
                 </div>
+              </div>
 
-                <label class="check">
-                  <input type="checkbox" id="s-active" checked />
-                  Mark as active
-                </label>
+              <fieldset class="days-fieldset hours-days">
+                <legend>Open days</legend>
+                <div class="days-row">
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="1" checked /><span>Mon</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="2" checked /><span>Tue</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="3" checked /><span>Wed</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="4" checked /><span>Thu</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="5" checked /><span>Fri</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="6" checked /><span>Sat</span></label>
+                  <label class="day-chip"><input type="checkbox" name="s-dow" value="0" /><span>Sun</span></label>
+                </div>
+              </fieldset>
 
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="s-open" class="field-label">Open time</label>
+                  <input id="s-open" type="time" value="09:00" required />
+                </div>
+                <div class="field">
+                  <label for="s-close" class="field-label">Close time</label>
+                  <input id="s-close" type="time" value="20:00" required />
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="s-step" class="field-label">Slot duration (min)</label>
+                  <input id="s-step" type="number" value="30" min="5" max="120" />
+                </div>
+                <div class="field field-check">
+                  <label class="compose-check hours-active-check" for="s-active">
+                    <input type="checkbox" id="s-active" checked />
+                    <span>Mark as active</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="hours-studio-actions">
                 <p id="schedule-status" class="status" role="status"></p>
-                <button type="submit" class="btn btn-teal" style="width:auto;padding:0.72rem 1.8rem">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  Save schedule
-                </button>
-              </form>
+                <button type="submit" class="btn btn-teal hours-save-btn">Save schedule</button>
+              </div>
+            </form>
+
+            <div class="hours-studio-list">
+              <div class="hours-list-card">
+                <div class="hours-list-head">
+                  <h3>Current schedules</h3>
+                  <span>Opening hours by date range</span>
+                </div>
+                <div id="schedules-list" class="schedules-list" role="list"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -389,20 +535,50 @@
 
 
   <!-- ════════════════════════════════════════════════════
-       DETAIL DRAWER
+       PATIENT DETAIL MODAL
   ════════════════════════════════════════════════════ -->
-  <aside id="drawer" class="drawer" hidden role="complementary">
-    <div class="drawer-backdrop" data-close-drawer></div>
-    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
-      <div class="drawer-header">
-        <h3 class="drawer-title" id="drawer-title">Assessment Detail</h3>
-        <button type="button" class="drawer-close-btn" data-close-drawer aria-label="Close detail panel">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+  <div id="patient-modal" class="patient-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pm-title">
+    <div class="patient-modal-backdrop" data-close-patient-modal></div>
+    <div class="patient-modal-box">
+      <div class="pm-header">
+        <div class="pm-header-left">
+          <div>
+            <div class="pm-header-eyebrow">Assessment</div>
+            <h3 class="pm-header-title" id="pm-title">Patient Detail</h3>
+          </div>
+        </div>
+        <div class="pm-header-actions">
+          <div id="pm-header-appt-actions" class="pm-header-appt-actions" hidden></div>
+          <button type="button" class="pm-close-btn" data-close-patient-modal aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="drawer-body" id="drawer-body"></div>
+      <div class="pm-body" id="pm-body">
+        <!-- populated by admin.js -->
+      </div>
     </div>
-  </aside>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       CONFIRM MODAL
+  ════════════════════════════════════════════════════ -->
+  <div id="confirm-modal" class="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-modal-backdrop" data-close-confirm></div>
+    <div class="confirm-modal-box">
+      <div class="confirm-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h3 class="confirm-title" id="confirm-title">Cancel appointment?</h3>
+      <p class="confirm-copy" id="confirm-copy">This will cancel the visit and email the patient.</p>
+      <div class="confirm-meta" id="confirm-meta" hidden></div>
+      <div class="confirm-actions">
+        <button type="button" class="btn confirm-btn-ghost" data-close-confirm id="confirm-cancel-btn">Keep booking</button>
+        <button type="button" class="btn confirm-btn-danger" id="confirm-ok">Cancel appointment</button>
+      </div>
+      <p class="confirm-status" id="confirm-status" role="status"></p>
+    </div>
+  </div>
 
 
   <script src="/static/admin/admin.js"></script>
