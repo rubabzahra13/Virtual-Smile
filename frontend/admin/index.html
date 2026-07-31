@@ -129,7 +129,7 @@
       <header class="admin-topbar" role="banner">
         <div class="topbar-left topbar-meta" id="topbar-meta">
           <p class="topbar-eyebrow" id="topbar-eyebrow">Overview</p>
-          <h2 class="top-title" id="top-title">Welcome admin</h2>
+          <h2 class="top-title" id="top-title">Dashboard</h2>
           <p class="top-subtitle" id="top-subtitle">Live overview of assessments and appointments.</p>
         </div>
         <div class="topbar-right">
@@ -199,7 +199,7 @@
                     <div class="clinic-filter-wrap" id="dash-filter-wrap">
                       <button type="button" class="clinic-filter-btn" id="dash-filter-btn" aria-haspopup="listbox" aria-expanded="false">
                         <span id="dash-filter-label">Today</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 8L1 3h10z"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                       </button>
                       <div class="clinic-filter-menu" id="dash-filter-menu" role="listbox" hidden>
                         <button type="button" class="clinic-filter-option is-active" role="option" data-value="today" aria-selected="true">Today</button>
@@ -209,28 +209,27 @@
                   </div>
                   <div id="dash-patient-list" class="clinic-patient-list" role="list"></div>
                 </div>
-
-                <div class="clinic-board-divider" aria-hidden="true"></div>
-
-                <div class="clinic-board-pane clinic-brief" id="dash-brief">
-                  <div class="clinic-card-head">
-                    <h3>Day brief</h3>
-                    <span class="clinic-brief-scope" id="dash-brief-scope"></span>
-                  </div>
-                  <div id="dash-brief-body" class="clinic-brief-body">
-                    <p class="clinic-empty">Loading schedule…</p>
-                  </div>
-                </div>
               </div>
-            </div>
 
-            <aside class="clinic-side">
-              <section class="clinic-card clinic-concerns">
+              <section class="clinic-card clinic-concerns" id="dash-concerns">
                 <div class="clinic-card-head">
                   <h3>Top concerns</h3>
                   <span class="clinic-concerns-total" id="dash-concerns-total"></span>
                 </div>
                 <div id="dash-concerns-chart" class="concerns-chart" aria-label="Top concerns chart"></div>
+              </section>
+            </div>
+
+            <aside class="clinic-side">
+              <section class="clinic-card clinic-brief-card" id="dash-brief">
+                <div class="brief-layout">
+                  <div class="clinic-card-head clinic-brief-head">
+                    <h3>Day brief</h3>
+                  </div>
+                  <div id="dash-brief-body" class="clinic-brief-body">
+                    <p class="clinic-empty">Loading schedule…</p>
+                  </div>
+                </div>
               </section>
 
               <section class="clinic-card clinic-pulse">
@@ -452,62 +451,65 @@
         <section id="panel-hours" class="panel hours-panel" role="tabpanel" aria-labelledby="tab-hours" hidden>
           <div class="hours-studio">
             <form id="schedule-form" class="hours-studio-form">
-              <div class="field">
-                <label for="s-label" class="field-label">Schedule name</label>
-                <input id="s-label" type="text" required placeholder="e.g. Ramadan hours" autocomplete="off" />
-              </div>
-
-              <div class="form-grid-2">
+              <div class="hours-studio-form-body">
                 <div class="field">
-                  <label for="s-start" class="field-label">Start date</label>
-                  <div class="picker-field">
-                    <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <input id="s-start" class="picker-input" type="date" required />
+                  <label for="s-label" class="field-label">Schedule name</label>
+                  <input id="s-label" type="text" required placeholder="e.g. Ramadan hours" autocomplete="off" />
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="field">
+                    <label for="s-start" class="field-label">Start date</label>
+                    <div class="picker-field">
+                      <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <input id="s-start" class="picker-input" type="date" required />
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="s-end" class="field-label">End date</label>
+                    <div class="picker-field">
+                      <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <input id="s-end" class="picker-input" type="date" required />
+                    </div>
                   </div>
                 </div>
-                <div class="field">
-                  <label for="s-end" class="field-label">End date</label>
-                  <div class="picker-field">
-                    <svg class="picker-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <input id="s-end" class="picker-input" type="date" required />
+
+                <fieldset class="days-fieldset hours-days">
+                  <legend>Open days</legend>
+                  <div class="days-row">
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="1" checked /><span>Mon</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="2" checked /><span>Tue</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="3" checked /><span>Wed</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="4" checked /><span>Thu</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="5" checked /><span>Fri</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="6" checked /><span>Sat</span></label>
+                    <label class="day-chip"><input type="checkbox" name="s-dow" value="0" /><span>Sun</span></label>
+                  </div>
+                </fieldset>
+
+                <div class="form-grid-2">
+                  <div class="field">
+                    <label for="s-open" class="field-label">Open time</label>
+                    <input id="s-open" type="time" value="09:00" required />
+                  </div>
+                  <div class="field">
+                    <label for="s-close" class="field-label">Close time</label>
+                    <input id="s-close" type="time" value="20:00" required />
                   </div>
                 </div>
-              </div>
 
-              <fieldset class="days-fieldset hours-days">
-                <legend>Open days</legend>
-                <div class="days-row">
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="1" checked /><span>Mon</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="2" checked /><span>Tue</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="3" checked /><span>Wed</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="4" checked /><span>Thu</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="5" checked /><span>Fri</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="6" checked /><span>Sat</span></label>
-                  <label class="day-chip"><input type="checkbox" name="s-dow" value="0" /><span>Sun</span></label>
-                </div>
-              </fieldset>
-
-              <div class="form-grid-2">
-                <div class="field">
-                  <label for="s-open" class="field-label">Open time</label>
-                  <input id="s-open" type="time" value="09:00" required />
-                </div>
-                <div class="field">
-                  <label for="s-close" class="field-label">Close time</label>
-                  <input id="s-close" type="time" value="20:00" required />
-                </div>
-              </div>
-
-              <div class="form-grid-2">
-                <div class="field">
-                  <label for="s-step" class="field-label">Slot duration (min)</label>
-                  <input id="s-step" type="number" value="30" min="5" max="120" />
-                </div>
-                <div class="field field-check">
-                  <label class="compose-check hours-active-check" for="s-active">
-                    <input type="checkbox" id="s-active" checked />
-                    <span>Mark as active</span>
-                  </label>
+                <div class="form-grid-2 hours-studio-options">
+                  <div class="field">
+                    <label for="s-step" class="field-label">Slot duration (min)</label>
+                    <input id="s-step" type="number" value="30" min="5" max="120" />
+                  </div>
+                  <div class="field field-check">
+                    <span class="field-label">Status</span>
+                    <label class="compose-check hours-active-check" for="s-active">
+                      <input type="checkbox" id="s-active" checked />
+                      <span>Mark as active</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

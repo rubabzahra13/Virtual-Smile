@@ -6,7 +6,7 @@
   const TAB_META = {
     dashboard: {
       eyebrow:  "Overview",
-      title:    "Welcome admin",
+      title:    "Dashboard",
       subtitle: "Live overview of assessments and appointments.",
     },
     reports: {
@@ -330,25 +330,33 @@
         return `<span class="dash-mix-seg is-${escapeHtml(key)}" style="flex:${Math.max(count, 0.01)}" title="${escapeHtml(r.hint || r.label)}: ${count}"></span>`;
       })
       .join("");
-    const legend = list
+    const rowsHtml = list
       .map((r) => {
         const count = Number(r.count) || 0;
         const share = Math.round((count / total) * 100);
         const key = String(r.key || "muted");
         const name = String(r.hint || r.label || "").split(" ")[0] || "Band";
         return `
-          <div class="dash-mix-item">
-            <span class="dash-mix-dot is-${escapeHtml(key)}" aria-hidden="true"></span>
-            <div class="dash-mix-copy">
-              <strong>${escapeHtml(name)}</strong>
-              <span>${count} · ${share}%</span>
+          <div class="dash-mix-row is-${escapeHtml(key)}">
+            <div class="dash-mix-row-top">
+              <span class="dash-mix-row-label">
+                <span class="dash-mix-dot is-${escapeHtml(key)}" aria-hidden="true"></span>
+                ${escapeHtml(name)}
+              </span>
+              <span class="dash-mix-row-meta">
+                <strong>${count}</strong>
+                <span>${share}%</span>
+              </span>
+            </div>
+            <div class="dash-mix-track" aria-hidden="true">
+              <span class="dash-mix-fill is-${escapeHtml(key)}" style="width:${share}%"></span>
             </div>
           </div>`;
       })
       .join("");
     el.innerHTML = `
       <div class="dash-mix-bar" role="img" aria-label="Score mix">${segs || `<span class="dash-mix-seg is-muted" style="flex:1"></span>`}</div>
-      <div class="dash-mix-legend">${legend}</div>
+      <div class="dash-mix-rows">${rowsHtml}</div>
     `;
   }
 
@@ -412,44 +420,66 @@
         const whenLabel = formatBookingWhen(b.date, b.time);
         const reportId = String(b.assessment_id || "").trim();
         const contactBits = [b.email, b.phone].filter(Boolean).map(String);
-        const contactLine =
-          active && contactBits.length
-            ? `<span class="clinic-patient-contact">${escapeHtml(contactBits.join(" · "))}</span>`
-            : "";
-        const checkedLine = `
-          <span class="clinic-patient-checked">
-            <span class="clinic-patient-checked-label">Last checked</span>
-            <span class="clinic-patient-checked-when">${escapeHtml(whenLabel)}</span>
-            ${
-              reportId
-                ? `<button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>`
-                : ""
-            }
-          </span>`;
+        const isActive = b.id === dashState.selectedId;
+        const metaRow =
+          isActive
+            ? `<div class="clinic-patient-meta">
+                ${
+                  contactBits.length
+                    ? `<span class="clinic-patient-contact">${escapeHtml(contactBits.join(" · "))}</span>`
+                    : `<span class="clinic-patient-contact is-empty">No contact on file</span>`
+                }
+                <span class="clinic-patient-meta-actions">
+                  <span class="clinic-patient-checked" title="${escapeHtml(whenLabel)}">
+                    <span class="clinic-patient-checked-label">Checked</span>
+                    <time class="clinic-patient-checked-when">${escapeHtml(whenLabel)}</time>
+                  </span>
+                  ${
+                    reportId
+                      ? `<button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>`
+                      : `<span class="clinic-patient-report is-disabled">No report</span>`
+                  }
+                </span>
+              </div>`
+            : reportId
+              ? `<div class="clinic-patient-meta is-compact">
+                  <button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>
+                </div>`
+              : "";
         return `
           <div class="clinic-patient-row${active}" role="listitem" data-dash-patient="${escapeHtml(b.id)}">
-            <span class="clinic-patient-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
-            <span class="clinic-patient-text">
-              <span class="clinic-patient-name">${escapeHtml(b.name || "Patient")}</span>
-              <span class="clinic-patient-sub tone-${tone}">${escapeHtml(visitLabel)}</span>
-              ${contactLine}
-              ${checkedLine}
-            </span>
-            <span class="clinic-time-pill">${escapeHtml(formatDashTime(b.time))}</span>
+            <div class="clinic-patient-main">
+              <span class="clinic-patient-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
+              <span class="clinic-patient-text">
+                <span class="clinic-patient-top">
+                  <span class="clinic-patient-name">${escapeHtml(b.name || "Patient")}</span>
+                  <span class="clinic-time-pill">${escapeHtml(formatDashTime(b.time))}</span>
+                </span>
+                <span class="clinic-patient-sub tone-${tone}">${escapeHtml(visitLabel)}</span>
+              </span>
+            </div>
+            ${metaRow}
           </div>`;
       })
       .join("");
     renderDashBrief();
   }
 
+  function formatCountdown(mins) {
+    if (mins == null || !Number.isFinite(mins)) return { label: "—", cls: "" };
+    if (mins <= 0) return { label: "Now / due", cls: "is-now" };
+    if (mins < 60) return { label: `In ${mins} min`, cls: mins <= 15 ? "is-soon" : "" };
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return { label: m ? `In ${h}h ${m}m` : `In ${h}h`, cls: "" };
+  }
+
   function renderDashBrief() {
     const body = $("#dash-brief-body");
-    const scope = $("#dash-brief-scope");
     if (!body) return;
 
     const isToday = dashState.filter === "today";
     const rows = currentPatientList();
-    if (scope) scope.textContent = isToday ? "Today" : "Upcoming";
 
     if (!rows.length) {
       body.innerHTML = `<p class="clinic-empty">${
@@ -474,123 +504,97 @@
     const next = remaining[0] || timed[0];
     const withAssess = rows.filter((b) => String(b.assessment_id || "").trim()).length;
     const walkins = Math.max(0, rows.length - withAssess);
-    const noAssessList = rows.filter((b) => !String(b.assessment_id || "").trim()).slice(0, 4);
-    const readyList = rows.filter((b) => String(b.assessment_id || "").trim()).slice(0, 4);
-    const later = remaining.slice(0, 5);
+    const clinicBooked = rows.filter((b) => b?.source === "admin").length;
+    const assessmentVisits = Math.max(0, rows.length - clinicBooked);
+    const noAssessList = rows.filter((b) => !String(b.assessment_id || "").trim());
 
+    const first = timed.find((x) => x.dt)?.dt;
+    const last = [...timed].reverse().find((x) => x.dt)?.dt;
+    const spanLabel =
+      first && last
+        ? `${formatDashTime(
+            `${String(first.getHours()).padStart(2, "0")}:${String(first.getMinutes()).padStart(2, "0")}`
+          )} → ${formatDashTime(
+            `${String(last.getHours()).padStart(2, "0")}:${String(last.getMinutes()).padStart(2, "0")}`
+          )}`
+        : "—";
+
+    const mins =
+      next?.dt != null ? Math.round((next.dt.getTime() - now.getTime()) / 60000) : null;
+    const countdown = formatCountdown(isToday ? mins : null);
     const nextName = next?.b?.name || "Patient";
     const nextTime = formatDashTime(next?.b?.time) || "—";
     const nextVisit = visitTypeLabel(next?.b || {});
-    const nextReport = String(next?.b?.assessment_id || "").trim();
-
-    const laterHtml = later.length
-      ? `<ul class="brief-timeline" role="list">
-          ${later
-            .map(({ b }) => {
-              const selected = b.id === dashState.selectedId ? " is-selected" : "";
-              const hasReport = String(b.assessment_id || "").trim();
-              return `<li class="brief-timeline-item${selected}" role="listitem">
-                <button type="button" class="brief-timeline-btn" data-dash-patient="${escapeHtml(b.id)}">
-                  <span class="brief-timeline-time">${escapeHtml(formatDashTime(b.time) || "—")}</span>
-                  <span class="brief-timeline-text">
-                    <span class="brief-timeline-name">${escapeHtml(b.name || "Patient")}</span>
-                    <span class="brief-timeline-meta">${escapeHtml(visitTypeLabel(b))}${
-                      hasReport ? " · Report ready" : " · No assessment"
-                    }</span>
-                  </span>
-                </button>
-              </li>`;
-            })
-            .join("")}
-        </ul>`
-      : "";
-
-    const watchHtml = noAssessList.length
-      ? `<div class="brief-block">
-          <h4 class="brief-block-title">Needs full exam</h4>
-          <p class="brief-block-note">No digital assessment on file — plan chairside charting.</p>
-          <ul class="brief-watch" role="list">
-            ${noAssessList
-              .map(
-                (b) => `<li role="listitem">
-                  <button type="button" class="brief-watch-btn" data-dash-patient="${escapeHtml(b.id)}">
-                    <span>${escapeHtml(b.name || "Patient")}</span>
-                    <span>${escapeHtml(formatDashTime(b.time) || "")}</span>
-                  </button>
-                </li>`
-              )
-              .join("")}
-          </ul>
-        </div>`
-      : `<div class="brief-block">
-          <h4 class="brief-block-title">Needs full exam</h4>
-          <p class="brief-block-note">All listed visits have a linked assessment.</p>
-        </div>`;
-
-    const readyHtml = readyList.length
-      ? `<div class="brief-block">
-          <h4 class="brief-block-title">Review before chair</h4>
-          <ul class="brief-watch" role="list">
-            ${readyList
-              .map((b) => {
-                const id = String(b.assessment_id || "").trim();
-                return `<li role="listitem">
-                  <button type="button" class="brief-watch-btn" data-dash-patient="${escapeHtml(b.id)}">
-                    <span>${escapeHtml(b.name || "Patient")}</span>
-                    <span>${escapeHtml(formatDashTime(b.time) || "")}</span>
-                  </button>
-                  ${
-                    id
-                      ? `<button type="button" class="brief-link" data-open-report="${escapeHtml(id)}">Open report</button>`
-                      : ""
-                  }
-                </li>`;
-              })
-              .join("")}
-          </ul>
-        </div>`
-      : "";
+    const nextHasReport = Boolean(String(next?.b?.assessment_id || "").trim());
+    const prepOk = noAssessList.length === 0;
 
     body.innerHTML = `
       <div class="brief-sheet">
-        <div class="brief-next">
-          <span class="brief-next-label">${isToday ? "Next up" : "First upcoming"}</span>
-          <div class="brief-next-main">
-            <strong class="brief-next-name">${escapeHtml(nextName)}</strong>
-            <span class="brief-next-time">${escapeHtml(nextTime)}</span>
+        <div class="brief-col brief-col-main">
+          <div class="brief-next">
+            <div class="brief-next-copy">
+              <span class="brief-next-label">${isToday ? "Next up" : "First upcoming"}</span>
+              <div class="brief-next-main">
+                <strong class="brief-next-name">${escapeHtml(nextName)}</strong>
+                <span class="brief-next-time">${escapeHtml(nextTime)}</span>
+              </div>
+              <p class="brief-next-meta">${escapeHtml(nextVisit)} · ${
+                nextHasReport ? "Report ready" : "No assessment"
+              }</p>
+              ${
+                isToday && countdown.label !== "—"
+                  ? `<span class="brief-countdown ${countdown.cls}">${escapeHtml(countdown.label)}</span>`
+                  : ""
+              }
+            </div>
+            <div class="brief-next-art" aria-hidden="true">
+              <img src="/static/assets/day-brief.png?v=7" alt="" width="775" height="896" />
+            </div>
           </div>
-          <p class="brief-next-meta">${escapeHtml(nextVisit)}${
-            nextReport ? " · Assessment linked" : " · Walk-in / no report"
-          }</p>
-          ${
-            next?.b?.id
-              ? `<button type="button" class="brief-select-btn" data-dash-patient="${escapeHtml(next.b.id)}">Select in list</button>`
-              : ""
-          }
+          <div class="brief-stats" role="list">
+            <div class="brief-stat" role="listitem">
+              <span class="brief-stat-value">${remaining.length}</span>
+              <span class="brief-stat-label">${isToday ? "Left today" : "Scheduled"}</span>
+            </div>
+            <div class="brief-stat" role="listitem">
+              <span class="brief-stat-value">${withAssess}</span>
+              <span class="brief-stat-label">With report</span>
+            </div>
+            <div class="brief-stat" role="listitem">
+              <span class="brief-stat-value">${walkins}</span>
+              <span class="brief-stat-label">No assessment</span>
+            </div>
+          </div>
         </div>
 
-        <div class="brief-stats" role="list">
-          <div class="brief-stat" role="listitem">
-            <span class="brief-stat-value">${remaining.length}</span>
-            <span class="brief-stat-label">${isToday ? "Left today" : "Scheduled"}</span>
-          </div>
-          <div class="brief-stat" role="listitem">
-            <span class="brief-stat-value">${withAssess}</span>
-            <span class="brief-stat-label">With report</span>
-          </div>
-          <div class="brief-stat" role="listitem">
-            <span class="brief-stat-value">${walkins}</span>
-            <span class="brief-stat-label">No assessment</span>
+        <div class="brief-col brief-col-info">
+          <div class="brief-insights" role="list">
+            <div class="brief-insight" role="listitem">
+              <span class="brief-insight-label">Schedule</span>
+              <strong class="brief-insight-value">${escapeHtml(spanLabel)}</strong>
+            </div>
+            <div class="brief-insight" role="listitem">
+              <span class="brief-insight-label">Visit mix</span>
+              <div class="brief-insight-split">
+                <span><strong>${assessmentVisits}</strong> assess</span>
+                <span><strong>${clinicBooked}</strong> clinic</span>
+              </div>
+            </div>
+            <div class="brief-insight ${prepOk ? "is-ok" : "is-warn"}" role="listitem">
+              <span class="brief-insight-label">Prep</span>
+              <strong class="brief-insight-value">${
+                prepOk
+                  ? "All linked"
+                  : `${noAssessList.length} need exam`
+              }</strong>
+              <span class="brief-insight-note">${
+                prepOk
+                  ? "Every visit has an assessment"
+                  : "Missing digital assessment"
+              }</span>
+            </div>
           </div>
         </div>
-
-        <div class="brief-block">
-          <h4 class="brief-block-title">${isToday ? "Remaining timeline" : "Upcoming timeline"}</h4>
-          ${laterHtml || `<p class="brief-block-note">No further visits in this view.</p>`}
-        </div>
-
-        ${watchHtml}
-        ${readyHtml}
       </div>
     `;
   }
