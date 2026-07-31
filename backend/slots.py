@@ -109,7 +109,14 @@ def free_slots_for_date(
 ) -> tuple[list[str], list[str]]:
     all_slots = generate_slots_for_date(schedules, day)
     booked = booked_times_set(bookings)
-    free = [s for s in all_slots if s not in booked]
+    today = date.today()
+    if day < today:
+        free = []
+    elif day == today:
+        now_hhmm = datetime.now().strftime("%H:%M")
+        free = [s for s in all_slots if s not in booked and s > now_hhmm]
+    else:
+        free = [s for s in all_slots if s not in booked]
     return free, sorted(booked)
 
 
@@ -132,15 +139,17 @@ def month_availability(
 
     days_in_month = monthrange(year, month)[1]
     result: dict[str, dict] = {}
+    today = date.today()
     for day_n in range(1, days_in_month + 1):
         day = date(year, month, day_n)
         key = day.isoformat()
         free, booked = free_slots_for_date(schedules, day, bookings_by_day.get(key, []))
         all_slots = generate_slots_for_date(schedules, day)
+        is_past = day < today
         result[key] = {
             "free_count": len(free),
             "booked_count": len(booked),
             "closed": len(all_slots) == 0,
-            "full": len(all_slots) > 0 and len(free) == 0,
+            "full": is_past or (len(all_slots) > 0 and len(free) == 0),
         }
     return result

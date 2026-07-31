@@ -2985,7 +2985,13 @@
         syncWalkinTimeUi({ disabled: true, label: "No open times" });
         return;
       }
-      const slots = Array.isArray(data.slots) ? data.slots : [];
+      let slots = Array.isArray(data.slots) ? data.slots : [];
+      const todayIso = isoDateLocal(startOfLocalDay());
+      if (day === todayIso) {
+        const now = new Date();
+        const currentHhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        slots = slots.filter((s) => s > currentHhmm);
+      }
       if (!slots.length) {
         hint.textContent = data.closed
           ? "Clinic closed on this date."

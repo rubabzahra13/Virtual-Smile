@@ -1549,8 +1549,7 @@
 
   function bookMinDate() {
     const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() + 1);
+    d.setHours(0, 0, 0, 0);
     return d;
   }
 
@@ -1660,7 +1659,14 @@
         return;
       }
       const data = await res.json();
-      bookFreeSlots = Array.isArray(data.slots) ? data.slots : [];
+      let slots = Array.isArray(data.slots) ? data.slots : [];
+      const todayIso = toLocalISODate(new Date());
+      if (iso === todayIso) {
+        const now = new Date();
+        const currentHhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        slots = slots.filter((s) => s > currentHhmm);
+      }
+      bookFreeSlots = slots;
       fillBookTimeSelect(bookFreeSlots, previous);
       if (hint) {
         if (data.closed || !bookFreeSlots.length) {

@@ -386,6 +386,22 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
 
     schedules = fetch_schedules()
     day_obj = date_cls.fromisoformat(day)
+    today_obj = date_cls.today()
+
+    if day_obj < today_obj:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot book an appointment for a past date.",
+        )
+
+    if day_obj == today_obj:
+        now_hhmm = datetime.now().strftime("%H:%M")
+        if slot <= now_hhmm:
+            raise HTTPException(
+                status_code=409,
+                detail="That time slot has already passed. Please choose a future time slot.",
+            )
+
     free, booked = free_slots_for_date(schedules, day_obj, fetch_bookings_for_date(day))
     if slot not in free:
         raise HTTPException(
@@ -546,7 +562,7 @@ def admin_stats(_: str = Depends(require_admin)):
         ).data or []
         bookings = (
             sb.table("bookings")
-            .select("id,status,name,email,phone,date,time,note,source,assessment_id")
+            .select("id,status,name,email,phone,date,time,note,source,assessment_id,created_at")
             .execute()
         ).data or []
         return assessments, bookings
@@ -601,13 +617,16 @@ def admin_stats(_: str = Depends(require_admin)):
         except ValueError:
             return None
 
+    all_confirmed = [b for b in bookings if b.get("status") == "confirmed"]
     bookings_week = sum(
-        1 for b in confirmed if _in_range(_parse_day(b.get("date")), week_start, today_dt)
+        1
+        for b in all_confirmed
+        if _in_range(_parse_day(b.get("created_at") or b.get("date")), week_start, today_dt)
     )
     bookings_prev = sum(
         1
-        for b in confirmed
-        if _in_range(_parse_day(b.get("date")), prev_week_start, prev_week_end)
+        for b in all_confirmed
+        if _in_range(_parse_day(b.get("created_at") or b.get("date")), prev_week_start, prev_week_end)
     )
     tests_week = sum(
         1
