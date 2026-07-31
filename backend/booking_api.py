@@ -1026,6 +1026,16 @@ def admin_patch_booking(
     return data
 
 
+def _deactivate_all_others(sb, exclude_id: str) -> None:
+    """Deactivate every schedule except the one being activated.
+
+    This is the application-layer half of the single-active-schedule guarantee;
+    the database trigger fn_single_active_schedule is the data-layer half.
+    Both layers are required so the invariant holds even under concurrent writes.
+    """
+    sb.table("slot_schedules").update({"active": False}).neq("id", exclude_id).eq("active", True).execute()
+
+
 @admin_router.get("/schedules")
 def admin_list_schedules(_: str = Depends(require_admin)):
     _require_db()
@@ -1049,7 +1059,11 @@ def admin_create_schedule(body: ScheduleBody, _: str = Depends(require_admin)):
     res = sb.table("slot_schedules").insert(row).execute()
     if not res.data:
         raise HTTPException(status_code=500, detail="Could not create schedule.")
-    return res.data[0]
+    created = res.data[0]
+    # Enforce single-active invariant: deactivate all others if new one is active.
+    if body.active:
+        _deactivate_all_others(sb, exclude_id=str(created["id"]))
+    return created
 
 
 @admin_router.patch("/schedules/{schedule_id}")
@@ -1070,6 +1084,9 @@ def admin_patch_schedule(
         "active": body.active,
     }
     sb = get_supabase()
+    # Enforce single-active invariant before writing.
+    if body.active:
+        _deactivate_all_others(sb, exclude_id=schedule_id)
     res = sb.table("slot_schedules").update(row).eq("id", schedule_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Schedule not found.")
@@ -1082,8 +1099,19 @@ def admin_set_schedule_active(
     body: ScheduleActiveBody,
     _: str = Depends(require_admin),
 ):
+    """Toggle the active flag for a schedule.
+
+    When activating (active=True) this atomically deactivates every other
+    schedule first, guaranteeing that at most one schedule is active at
+    any point in time.
+    """
     _require_db()
     sb = get_supabase()
+    if body.active:
+        # Step 1: deactivate all others (application layer).
+        # The DB trigger fn_single_active_schedule is the data-layer safety net.
+        _deactivate_all_others(sb, exclude_id=schedule_id)
+    # Step 2: set the requested state on the target schedule.
     res = (
         sb.table("slot_schedules")
         .update({"active": body.active})

@@ -2565,76 +2565,82 @@
     };
   }
 
+  function renderSchedules() {
+    const list = $("#schedules-list");
+    if (!list) return;
+    if (!schedulesCache.length) {
+      list.innerHTML = emptyState("No schedules yet. Add one on the left.");
+      return;
+    }
+    list.innerHTML = schedulesCache.map((s) => {
+      const openDays = new Set(Array.isArray(s.days_of_week) ? s.days_of_week.map(Number) : []);
+      const isActive = !!s.active;
+      const open = formatTime12(s.open_time);
+      const close = formatTime12(s.close_time);
+      const step = `${s.slot_minutes || 30} min`;
+      const weekOrder = [
+        { dow: 1, label: "M" },
+        { dow: 2, label: "T" },
+        { dow: 3, label: "W" },
+        { dow: 4, label: "T" },
+        { dow: 5, label: "F" },
+        { dow: 6, label: "S" },
+        { dow: 0, label: "S" },
+      ];
+      return `
+        <article class="schedule-card${isActive ? " is-active" : " is-inactive"}" role="listitem" data-schedule="${escapeHtml(s.id)}">
+          <div class="schedule-card-top">
+            <h4 class="schedule-label">${escapeHtml(s.label || "Schedule")}</h4>
+            <div class="schedule-active-seg" role="group" aria-label="Schedule status">
+              <button type="button" class="schedule-active-btn${isActive ? " is-on" : ""}"
+                data-set-active="${escapeHtml(s.id)}" data-active="true" ${isActive ? "aria-pressed=\"true\"" : "aria-pressed=\"false\""}>
+                Active
+              </button>
+              <button type="button" class="schedule-active-btn${!isActive ? " is-on" : ""}"
+                data-set-active="${escapeHtml(s.id)}" data-active="false" ${!isActive ? "aria-pressed=\"true\"" : "aria-pressed=\"false\""}>
+                Inactive
+              </button>
+            </div>
+          </div>
+          <div class="schedule-stat-row">
+            <div class="schedule-stat">
+              <span class="schedule-stat-label">Dates</span>
+              <strong>${escapeHtml(formatIsoDate(s.start_date))} → ${escapeHtml(formatIsoDate(s.end_date))}</strong>
+            </div>
+            <div class="schedule-stat">
+              <span class="schedule-stat-label">Hours</span>
+              <strong>${escapeHtml(open)} – ${escapeHtml(close)}</strong>
+            </div>
+            <div class="schedule-stat">
+              <span class="schedule-stat-label">Slots</span>
+              <strong>${escapeHtml(step)}</strong>
+            </div>
+          </div>
+          <div class="schedule-card-foot">
+            <div class="schedule-days" aria-label="Open days">
+              ${weekOrder.map(({ dow, label }) => {
+                const on = openDays.has(dow);
+                return `<span class="schedule-day${on ? " is-on" : ""}" title="${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}">${label}</span>`;
+              }).join("")}
+            </div>
+            <button type="button" class="schedule-delete-btn" data-del-schedule="${escapeHtml(s.id)}" aria-label="Delete schedule">
+              Delete
+            </button>
+          </div>
+        </article>
+      `;
+    }).join("");
+  }
+
   async function loadSchedules() {
     const list = $("#schedules-list");
     try {
       const data = await api("/admin/api/schedules");
       schedulesCache = Array.isArray(data.items) ? data.items : [];
-      if (!schedulesCache.length) {
-        list.innerHTML = emptyState("No schedules yet. Add one on the left.");
-        return;
-      }
-      list.innerHTML = schedulesCache.map((s) => {
-        const openDays = new Set(Array.isArray(s.days_of_week) ? s.days_of_week.map(Number) : []);
-        const isActive = !!s.active;
-        const open = formatTime12(s.open_time);
-        const close = formatTime12(s.close_time);
-        const step = `${s.slot_minutes || 30} min`;
-        const weekOrder = [
-          { dow: 1, label: "M" },
-          { dow: 2, label: "T" },
-          { dow: 3, label: "W" },
-          { dow: 4, label: "T" },
-          { dow: 5, label: "F" },
-          { dow: 6, label: "S" },
-          { dow: 0, label: "S" },
-        ];
-        return `
-          <article class="schedule-card${isActive ? " is-active" : " is-inactive"}" role="listitem" data-schedule="${escapeHtml(s.id)}">
-            <div class="schedule-card-top">
-              <h4 class="schedule-label">${escapeHtml(s.label || "Schedule")}</h4>
-              <div class="schedule-active-seg" role="group" aria-label="Schedule status">
-                <button type="button" class="schedule-active-btn${isActive ? " is-on" : ""}"
-                  data-set-active="${escapeHtml(s.id)}" data-active="true" ${isActive ? "aria-pressed=\"true\"" : "aria-pressed=\"false\""}>
-                  Active
-                </button>
-                <button type="button" class="schedule-active-btn${!isActive ? " is-on" : ""}"
-                  data-set-active="${escapeHtml(s.id)}" data-active="false" ${!isActive ? "aria-pressed=\"true\"" : "aria-pressed=\"false\""}>
-                  Inactive
-                </button>
-              </div>
-            </div>
-            <div class="schedule-stat-row">
-              <div class="schedule-stat">
-                <span class="schedule-stat-label">Dates</span>
-                <strong>${escapeHtml(formatIsoDate(s.start_date))} → ${escapeHtml(formatIsoDate(s.end_date))}</strong>
-              </div>
-              <div class="schedule-stat">
-                <span class="schedule-stat-label">Hours</span>
-                <strong>${escapeHtml(open)} – ${escapeHtml(close)}</strong>
-              </div>
-              <div class="schedule-stat">
-                <span class="schedule-stat-label">Slots</span>
-                <strong>${escapeHtml(step)}</strong>
-              </div>
-            </div>
-            <div class="schedule-card-foot">
-              <div class="schedule-days" aria-label="Open days">
-                ${weekOrder.map(({ dow, label }) => {
-                  const on = openDays.has(dow);
-                  return `<span class="schedule-day${on ? " is-on" : ""}" title="${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dow]}">${label}</span>`;
-                }).join("")}
-              </div>
-              <button type="button" class="schedule-delete-btn" data-del-schedule="${escapeHtml(s.id)}" aria-label="Delete schedule">
-                Delete
-              </button>
-            </div>
-          </article>
-        `;
-      }).join("");
+      renderSchedules();
     } catch (e) {
       schedulesCache = [];
-      list.innerHTML = errorState(e.message);
+      if (list) list.innerHTML = errorState(e.message);
     }
   }
 
@@ -3465,17 +3471,31 @@
       const next = activeBtn.dataset.active === "true";
       const current = schedulesCache.find((row) => String(row.id) === String(id));
       if (!current) return;
-      if (!!current.active === next) return;
+      if (!!current.active === next) return; // already in the desired state
+
+      // ── Optimistic UI: apply locally before API responds ──
+      if (next) {
+        // Activating this schedule → mark every other as inactive in local cache.
+        schedulesCache.forEach((s) => { s.active = String(s.id) === String(id); });
+      } else {
+        current.active = false;
+      }
       activeBtn.disabled = true;
+      renderSchedules(); // instant re-render from updated cache – no API call
+
       try {
-        await api(`/admin/api/schedules/${id}`, {
+        // Use the dedicated /active sub-route which enforces single-active atomically.
+        await api(`/admin/api/schedules/${id}/active`, {
           method: "PATCH",
-          body: JSON.stringify(schedulePatchPayload(current, { active: next })),
+          body: JSON.stringify({ active: next }),
         });
+        // Re-fetch authoritative state (other schedules may have been deactivated server-side).
         await loadSchedules();
       } catch (ex) {
+        // Roll back optimistic update on error.
+        schedulesCache.forEach((s) => { s.active = String(s.id) === String(id) ? !next : s.active; });
+        renderSchedules();
         alert(ex.message);
-        activeBtn.disabled = false;
       }
       return;
     }
