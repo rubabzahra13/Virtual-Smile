@@ -1088,7 +1088,15 @@
     }
     if (name === "appointments") loadBookings();
     if (name === "hours")        loadSchedules();
-    if (name === "book")         initWalkinBookingUi();
+    if (name === "book") {
+      const status = $("#walkin-status");
+      const newBtn = $("#w-new-booking-btn");
+      if ((newBtn && !newBtn.hidden) || (status && status.textContent.trim().length > 0)) {
+        resetWalkinBookingForm();
+      } else {
+        initWalkinBookingUi();
+      }
+    }
   }
 
   function refreshAll() {
@@ -1757,7 +1765,35 @@
     $("#w-name")?.focus();
   }
 
+  function resetWalkinBookingForm() {
+    const form = $("#walkin-form");
+    if (form) form.reset();
+    if ($("#w-name")) $("#w-name").value = "";
+    if ($("#w-email")) $("#w-email").value = "";
+    if ($("#w-phone")) $("#w-phone").value = "";
+    if ($("#w-note")) $("#w-note").value = "";
+    if ($("#w-assessment-id")) $("#w-assessment-id").value = "";
+
+    const status = $("#walkin-status");
+    if (status) {
+      status.textContent = "";
+      status.className = "status";
+    }
+
+    const confirmBtn = $("#w-confirm-btn");
+    if (confirmBtn) {
+      confirmBtn.hidden = false;
+      confirmBtn.disabled = false;
+    }
+
+    const newBtn = $("#w-new-booking-btn");
+    if (newBtn) newBtn.hidden = true;
+
+    initWalkinBookingUi();
+  }
+
   function fillWalkinForm({ name = "", email = "", phone = "", assessmentId = "", note = "", statusText = "" } = {}) {
+    resetWalkinBookingForm();
     if ($("#w-name")) $("#w-name").value = name || "";
     if ($("#w-email")) $("#w-email").value = email || "";
     if ($("#w-phone")) $("#w-phone").value = phone || "";
@@ -3559,14 +3595,43 @@
         ? "Booking confirmed. Confirmation email sent to the patient."
         : "Booking confirmed. Email could not be sent — check email settings.";
       status.className   = created?.email_sent === false ? "status is-error" : "status is-ok";
-      e.target.reset();
+      
+      const confirmBtn = $("#w-confirm-btn");
+      if (confirmBtn) confirmBtn.hidden = true;
+      const newBtn = $("#w-new-booking-btn");
+      if (newBtn) {
+        newBtn.hidden = false;
+        newBtn.focus();
+      }
+
       if ($("#w-assessment-id")) $("#w-assessment-id").value = "";
-      initWalkinBookingUi();
       loadBookings();
       loadStats();
     } catch (ex) {
       status.textContent = ex.message;
       status.className   = "status is-error";
+      const confirmBtn = $("#w-confirm-btn");
+      if (confirmBtn) confirmBtn.hidden = false;
+      const newBtn = $("#w-new-booking-btn");
+      if (newBtn) newBtn.hidden = false;
+    }
+  });
+
+  $("#w-new-booking-btn")?.addEventListener("click", () => {
+    resetWalkinBookingForm();
+    $("#w-name")?.focus();
+  });
+
+  // Clear error message when editing walk-in form fields
+  $("#walkin-form")?.addEventListener("input", () => {
+    const status = $("#walkin-status");
+    if (status?.classList.contains("is-error")) {
+      status.textContent = "";
+      status.className = "status";
+      const newBtn = $("#w-new-booking-btn");
+      if (newBtn) newBtn.hidden = true;
+      const confirmBtn = $("#w-confirm-btn");
+      if (confirmBtn) confirmBtn.hidden = false;
     }
   });
 

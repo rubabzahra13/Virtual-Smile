@@ -4203,21 +4203,47 @@ button.data-card { cursor: pointer; }
   margin: 0;
 }
 
+.book-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
 .book-confirm-btn,
+.book-new-btn,
 .hours-save-btn {
+  flex: 1 1 0%;
+  min-width: 0;
   width: 100%;
   min-height: 2.65rem;
   border-radius: var(--r-pill);
   font-weight: 700;
   letter-spacing: 0.01em;
   background: var(--navy);
+  color: #fff;
   box-shadow: var(--shadow-navy);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .book-confirm-btn:hover:not(:disabled),
 .hours-save-btn:hover:not(:disabled) {
   background: var(--navy-mid);
   filter: none;
+}
+
+.book-new-btn {
+  background: var(--surface-soft);
+  color: var(--navy);
+  border: 1.5px solid rgba(32, 64, 136, 0.22);
+  box-shadow: var(--shadow-xs);
+}
+
+.book-new-btn:hover:not(:disabled) {
+  background: rgba(32, 64, 136, 0.08);
+  color: var(--navy-dark);
 }
 
 .book-studio-right {
