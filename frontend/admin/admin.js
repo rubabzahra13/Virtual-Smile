@@ -420,32 +420,6 @@
         const whenLabel = formatBookingWhen(b.date, b.time);
         const reportId = String(b.assessment_id || "").trim();
         const contactBits = [b.email, b.phone].filter(Boolean).map(String);
-        const isActive = b.id === dashState.selectedId;
-        const metaRow =
-          isActive
-            ? `<div class="clinic-patient-meta">
-                ${
-                  contactBits.length
-                    ? `<span class="clinic-patient-contact">${escapeHtml(contactBits.join(" · "))}</span>`
-                    : `<span class="clinic-patient-contact is-empty">No contact on file</span>`
-                }
-                <span class="clinic-patient-meta-actions">
-                  <span class="clinic-patient-checked" title="${escapeHtml(whenLabel)}">
-                    <span class="clinic-patient-checked-label">Checked</span>
-                    <time class="clinic-patient-checked-when">${escapeHtml(whenLabel)}</time>
-                  </span>
-                  ${
-                    reportId
-                      ? `<button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>`
-                      : `<span class="clinic-patient-report is-disabled">No report</span>`
-                  }
-                </span>
-              </div>`
-            : reportId
-              ? `<div class="clinic-patient-meta is-compact">
-                  <button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>
-                </div>`
-              : "";
         return `
           <div class="clinic-patient-row${active}" role="listitem" data-dash-patient="${escapeHtml(b.id)}">
             <div class="clinic-patient-main">
@@ -458,10 +432,34 @@
                 <span class="clinic-patient-sub tone-${tone}">${escapeHtml(visitLabel)}</span>
               </span>
             </div>
-            ${metaRow}
+            <div class="clinic-patient-meta">
+              ${
+                contactBits.length
+                  ? `<span class="clinic-patient-contact">${escapeHtml(contactBits.join(" · "))}</span>`
+                  : `<span class="clinic-patient-contact is-empty">No contact on file</span>`
+              }
+              <span class="clinic-patient-meta-actions">
+                <span class="clinic-patient-checked" title="${escapeHtml(whenLabel)}">
+                  <span class="clinic-patient-checked-label">Checked</span>
+                  <time class="clinic-patient-checked-when">${escapeHtml(whenLabel)}</time>
+                </span>
+                ${
+                  reportId
+                    ? `<button type="button" class="clinic-patient-report" data-open-report="${escapeHtml(reportId)}">View report</button>`
+                    : `<span class="clinic-patient-report is-disabled">No report</span>`
+                }
+              </span>
+            </div>
           </div>`;
       })
       .join("");
+
+    const activeRow = list.querySelector(".clinic-patient-row.is-active");
+    if (activeRow) {
+      requestAnimationFrame(() => {
+        activeRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+    }
     renderDashBrief();
   }
 

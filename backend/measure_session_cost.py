@@ -1,16 +1,17 @@
 """
-Live max-session Gemini usage measurement.
+Live max-session usage measurement (production model stack).
 
 One full patient session:
-  3 images -> quality + detection + explanation
-  treatment simulation
-  5 chat messages
+  3 images -> quality + detection + explanation  (gemini-3.5-flash-lite)
+  treatment simulation                             (GEMINI_SIMULATION_MODEL)
+  5 chat messages                                  (Groq llama-3.1-8b-instant)
 
-Tokens come from Gemini usage_metadata (not estimates).
+Tokens come from live API usage (Gemini usage_metadata / Groq usage), not estimates.
 """
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import sys
@@ -18,6 +19,7 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -28,12 +30,14 @@ from patient_features import (  # noqa: E402
     _treatment_edit_brief,
     build_chat_prompt,
 )
+from providers import call_groq_text  # noqa: E402
 from report import build_report  # noqa: E402
 
 ASSETS = ROOT / "frontend" / "assets"
 OUT_PATH = ROOT / "backend" / "session_cost_measured.json"
+DOCS_OUT_PATH = ROOT / "docs" / "session_cost_measured_rerun.json"
 
-# Official paid-tier rates (USD per 1M tokens) — ai.google.dev/gemini-api/docs/pricing
+# Official paid-tier rates (USD per 1M tokens)
 RATES = {
     "gemini-3.5-flash-lite": {
         "input": 0.30,
@@ -54,7 +58,14 @@ RATES = {
         "output_text": 1.50,
         "output_image": 30.00,
     },
+    "llama-3.1-8b-instant": {
+        "input": 0.05,
+        "output": 0.08,
+    },
 }
+
+QWEN_SIM_FLAT_USD = 0.02
+CHAT_MODEL = os.getenv("PATIENT_CHAT_MODEL", "llama-3.1-8b-instant")
 
 
 def _usage_dict(usage) -> dict:
@@ -143,7 +154,34 @@ def cost_flash_image(meta: dict, model: str = "gemini-3.1-flash-image") -> dict:
     }
 
 
+def _upscale_long_edge(path: Path, long_edge: int = 1280) -> tuple[bytes, str, list[int]]:
+    img = Image.open(path).convert("RGB")
+    w, h = img.size
+    scale = long_edge / max(w, h)
+    if scale > 1:
+        img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90, optimize=True)
+    data = buf.getvalue()
+    return data, "image/jpeg", list(img.size)
+
+
 def load_images():
+    """Prefer complex clinical photo (same as prior bad-teeth measure); else example trio."""
+    complex_path = ASSETS / "oral changes 2.jpg"
+    if complex_path.exists():
+        data, mime, size = _upscale_long_edge(complex_path, 1280)
+        print(
+            f"loaded {complex_path.name}: {len(data)} bytes, size={size} "
+            f"(used as front/left/right)"
+        )
+        return [(data, mime)] * 3, {
+            "case": "bad_teeth_complex",
+            "image_files": [f"{complex_path.name} (upscaled x3 as front/left/right)"],
+            "prepared_size": size,
+            "prepared_bytes": len(data),
+        }
+
     paths = [
         ASSETS / "example-front.png",
         ASSETS / "example-left.png",
@@ -154,7 +192,15 @@ def load_images():
         data = p.read_bytes()
         images.append((data, "image/png"))
         print(f"loaded {p.name}: {len(data)} bytes")
-    return images
+    return images, {
+        "case": "example_trio",
+        "image_files": [p.name for p in paths],
+    }
+
+
+def cost_groq_chat(inp: int, out: int) -> float:
+    r = RATES["llama-3.1-8b-instant"]
+    return (inp / 1_000_000) * r["input"] + (out / 1_000_000) * r["output"]
 
 
 def run_gemini(model: str, contents) -> tuple[str, dict, float]:
@@ -208,7 +254,8 @@ def measure_analysis(images) -> tuple[list[dict], dict, str]:
         }
     )
     if not quality_result.get("ok", True):
-        raise RuntimeError(f"Quality rejected: {quality_result}")
+        print(f"  quality rejected (continuing for cost measure): {quality_result.get('issues')}")
+        # Still proceed — we need detection/sim/chat token costs for budgeting.
 
     d_text, d_meta, d_lat = run_gemini(model, [DETECTION_PROMPT, *image_parts])
     d_in, d_out = _billable_text_io(d_meta)
@@ -277,15 +324,20 @@ def measure_analysis(images) -> tuple[list[dict], dict, str]:
         quality_result=quality_result,
         detection_result=detection_result,
     )
-    return steps, scoring_result, report_text
+    return steps, scoring_result, report_text, quality_result
 
 
-def measure_simulation(front_bytes: bytes, report_text: str, findings_json: str | None) -> dict:
+def measure_simulation(
+    front_bytes: bytes,
+    report_text: str,
+    findings_json: str | None,
+    front_mime: str = "image/png",
+) -> dict:
     from google import genai
     from google.genai import types
 
     model = os.getenv("GEMINI_SIMULATION_MODEL", "gemini-3.1-flash-image")
-    edit_bytes, edit_mime = _prepare_image_for_edit(front_bytes, "image/png")
+    edit_bytes, edit_mime = _prepare_image_for_edit(front_bytes, front_mime)
     treatment_brief = _treatment_edit_brief(report_text, findings_json)
 
     prompt = f"""TASK: Inpaint/edit the ATTACHED photo only.
@@ -366,32 +418,40 @@ OUTPUT: one edited image of the SAME attached smile after those treatments.
 
 
 def measure_chat(question: str, report_text: str, overall_score) -> dict:
-    model = os.getenv("PATIENT_CHAT_MODEL", "gemini-3.5-flash-lite")
+    model = CHAT_MODEL
     prompt = build_chat_prompt(question, report_text, overall_score)
-    text, meta, latency = run_gemini(model, prompt)
-    inp, out = _billable_text_io(meta)
+    usage = call_groq_text(prompt, model=model)
+    inp = int(usage.get("input_tokens") or 0)
+    out = int(usage.get("output_tokens") or 0)
+    text = (usage.get("raw_text") or "").strip()
     return {
         "step": "chat",
-        "model": model,
+        "model": f"groq/{model}",
         "question": question,
-        "answer_chars": len(text.strip()),
-        "latency_seconds": latency,
-        "usage_metadata": meta,
+        "answer_chars": len(text),
+        "latency_seconds": usage.get("latency_seconds"),
+        "usage_metadata": {
+            "prompt_tokens": inp,
+            "completion_tokens": out,
+        },
         "input_tokens": inp,
         "output_tokens": out,
-        "cost_usd": round(cost_flash_lite(inp, out), 8),
-        "source": "raw_usage_metadata",
+        "cost_usd": round(cost_groq_chat(inp, out), 8),
+        "source": "groq_usage",
     }
 
 
 def main():
     if not os.getenv("GEMINI_API_KEY"):
         raise SystemExit("GEMINI_API_KEY missing")
+    if not os.getenv("GROQ_API_KEY"):
+        raise SystemExit("GROQ_API_KEY missing")
 
-    images = load_images()
+    images, image_meta = load_images()
 
     print("\n=== 1) Analysis (quality + detection + explanation) ===")
-    analysis_rows, scoring, report_text = measure_analysis(images)
+    print("  model: gemini-3.5-flash-lite")
+    analysis_rows, scoring, report_text, quality_result = measure_analysis(images)
     for row in analysis_rows:
         print(
             f"  {row['step']}: in={row['input_tokens']} out={row['output_tokens']} "
@@ -399,16 +459,18 @@ def main():
         )
     print(f"score={scoring.get('overall_score')} report_chars={len(report_text)}")
 
-    print("\n=== 2) Treatment simulation ===")
+    print("\n=== 2) Treatment simulation (Gemini image) ===")
     findings_json = json.dumps(scoring.get("findings") or {})
-    sim = measure_simulation(images[0][0], report_text, findings_json)
+    sim = measure_simulation(
+        images[0][0], report_text, findings_json, front_mime=images[0][1]
+    )
     print(
         f"  sim: got_image={sim['got_image']} in={sim['input_tokens']} "
         f"text_out={sim['text_output_tokens']} image_out={sim['image_output_tokens']} "
-        f"cost=${sim['cost_usd']:.6f} meta={sim['usage_metadata']}"
+        f"cost=${sim['cost_usd']:.6f} model={sim['model']} meta={sim['usage_metadata']}"
     )
 
-    print("\n=== 3) Five chatbot messages ===")
+    print(f"\n=== 3) Five chatbot messages (Groq {CHAT_MODEL}) ===")
     questions = [
         "What are my main dental concerns from this report?",
         "Do I need braces or clear aligners based on these findings?",
@@ -429,6 +491,7 @@ def main():
     total_cost = sum(float(s["cost_usd"]) for s in steps)
     total_in = sum(int(s.get("input_tokens") or 0) for s in steps)
     total_out = sum(int(s.get("output_tokens") or 0) for s in steps)
+    qwen_session = round(total_cost - float(sim["cost_usd"]) + QWEN_SIM_FLAT_USD, 8)
 
     monthly = {
         "100_max_sessions": round(total_cost * 100, 4),
@@ -438,7 +501,6 @@ def main():
         "10000_max_sessions": round(total_cost * 10000, 4),
     }
 
-    # Cost formula steps for transparency
     formula_steps = []
     for s in steps:
         if s["step"] == "simulation":
@@ -453,11 +515,23 @@ def main():
                     "cost_usd": s["cost_usd"],
                 }
             )
+        elif s["step"] == "chat":
+            formula_steps.append(
+                {
+                    "step": f"chat:{s['question'][:40]}",
+                    "formula": (
+                        f"({s['input_tokens']}/1e6)*0.05 + ({s['output_tokens']}/1e6)*0.08"
+                    ),
+                    "cost_usd": s["cost_usd"],
+                }
+            )
         else:
             formula_steps.append(
                 {
-                    "step": s["step"] if s["step"] != "chat" else f"chat:{s['question'][:40]}",
-                    "formula": f"({s['input_tokens']}/1e6)*0.30 + ({s['output_tokens']}/1e6)*2.50",
+                    "step": s["step"],
+                    "formula": (
+                        f"({s['input_tokens']}/1e6)*0.30 + ({s['output_tokens']}/1e6)*2.50"
+                    ),
                     "cost_usd": s["cost_usd"],
                 }
             )
@@ -465,14 +539,24 @@ def main():
     payload = {
         "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "scenario": {
+            **image_meta,
             "images": 3,
-            "image_files": ["example-front.png", "example-left.png", "example-right.png"],
             "analysis_passes": ["quality", "detection", "explanation"],
+            "analysis_model": "gemini-3.5-flash-lite",
+            "simulation_model": sim["model"],
+            "chat_model": f"groq/{CHAT_MODEL}",
             "simulation": True,
             "chat_messages": 5,
             "total_llm_calls": len(steps),
+            "quality_ok": bool(quality_result.get("ok", True)),
+            "continued_despite_quality": not bool(quality_result.get("ok", True)),
+            "quality_issues": quality_result.get("issues"),
         },
-        "pricing_source": "https://ai.google.dev/gemini-api/docs/pricing",
+        "pricing_source": {
+            "gemini": "https://ai.google.dev/gemini-api/docs/pricing",
+            "groq": "https://groq.com/pricing",
+            "qwen_wavespeed_flat_usd": QWEN_SIM_FLAT_USD,
+        },
         "rates_usd_per_1m": RATES,
         "overall_score": scoring.get("overall_score"),
         "report_chars": len(report_text),
@@ -482,23 +566,36 @@ def main():
             "input_tokens": total_in,
             "output_tokens": total_out,
             "total_tokens": total_in + total_out,
-            "cost_usd": round(total_cost, 8),
+            "cost_usd_gemini_sim": round(total_cost, 8),
+            "cost_usd_if_qwen_sim": qwen_session,
+            "simulation_cost_usd": sim["cost_usd"],
+            "chat_cost_usd": round(sum(float(c["cost_usd"]) for c in chat_rows), 8),
         },
-        "monthly_projections_usd": monthly,
+        "monthly_projections_usd": {
+            "gemini_sim": monthly,
+            "if_qwen_sim": {
+                "100_max_sessions": round(qwen_session * 100, 4),
+                "500_max_sessions": round(qwen_session * 500, 4),
+                "1000_max_sessions": round(qwen_session * 1000, 4),
+            },
+        },
         "notes": [
-            "Tokens are from Gemini usage_metadata on live API calls.",
-            "Flash-Lite billable output = candidates_token_count + thoughts_token_count.",
-            "Image model: input $0.50/1M, text+thinking $3/1M, image output $60/1M.",
-            "Images used are the app example front/left/right photos (max upload case).",
+            "Analysis/sim tokens from live Gemini usage_metadata.",
+            "Chat tokens from live Groq usage on llama-3.1-8b-instant.",
+            "Qwen session alternative uses WaveSpeed flat $0.02/edit (from account avg).",
             "Monthly figures assume every session is this max path (3 images + sim + 5 chats).",
         ],
     }
 
-    OUT_PATH.write_text(json.dumps(payload, indent=2))
+    text = json.dumps(payload, indent=2)
+    OUT_PATH.write_text(text)
+    DOCS_OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DOCS_OUT_PATH.write_text(text)
     print("\n=== SESSION TOTAL ===")
     print(json.dumps(payload["session_totals"], indent=2))
-    print("monthly:", json.dumps(monthly, indent=2))
+    print("monthly gemini sim:", json.dumps(monthly, indent=2))
     print(f"wrote {OUT_PATH}")
+    print(f"wrote {DOCS_OUT_PATH}")
 
 
 if __name__ == "__main__":

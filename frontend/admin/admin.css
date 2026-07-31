@@ -1199,29 +1199,41 @@ select {
 .clinic-patient-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  overflow: auto;
+  gap: 0.45rem;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-height: 0;
   flex: 1;
-  padding: 0.15rem 0.1rem 0.25rem;
+  padding: 0.1rem 0.15rem 0.2rem 0.05rem;
+  scroll-snap-type: y mandatory;
+  scroll-padding-block: 0.1rem;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .clinic-patient-row {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 0;
   width: 100%;
+  flex: 0 0 calc(100% - 0.15rem);
+  min-height: calc(100% - 0.15rem);
+  max-height: calc(100% - 0.15rem);
   text-align: left;
   border: 1px solid rgba(32, 64, 136, 0.08);
   background: #fff;
   border-radius: 1rem;
-  padding: 0;
+  padding: 0.65rem 0.75rem 0.6rem 0.85rem;
   cursor: pointer;
   font-family: var(--font-body);
   box-shadow: 0 1px 2px rgba(32, 64, 136, 0.04);
   overflow: hidden;
   position: relative;
-  transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease, transform var(--t-fast) ease;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
+  transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease, background var(--t-fast) ease;
 }
 
 .clinic-patient-row:hover {
@@ -1233,33 +1245,6 @@ select {
   border-color: rgba(0, 152, 152, 0.28);
   box-shadow: 0 10px 24px rgba(32, 64, 136, 0.1);
   background: linear-gradient(180deg, #ffffff 0%, #f7fbfb 100%);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 0.7rem;
-  align-items: center;
-  padding: 0.7rem 0.8rem 0.7rem 0.95rem;
-}
-
-.clinic-patient-row.is-active .clinic-patient-main {
-  display: contents;
-}
-
-.clinic-patient-row.is-active .clinic-patient-avatar {
-  grid-row: 1 / 3;
-  align-self: center;
-}
-
-.clinic-patient-row.is-active .clinic-patient-text {
-  grid-column: 2;
-  min-width: 0;
-}
-
-.clinic-patient-row.is-active .clinic-patient-meta {
-  grid-column: 2;
-  align-items: center;
-  padding: 0.4rem 0 0;
-  border-top: none;
-  background: transparent;
 }
 
 .clinic-patient-main {
@@ -1267,7 +1252,7 @@ select {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.7rem;
   align-items: center;
-  padding: 0.7rem 0.8rem 0.65rem 0.95rem;
+  min-width: 0;
 }
 
 .clinic-patient-avatar {
@@ -1354,18 +1339,11 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.5rem 0.8rem 0.55rem 0.95rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
   border-top: 1px solid rgba(32, 64, 136, 0.07);
-  background: rgba(255, 255, 255, 0.65);
-  min-width: 0;
-}
-
-.clinic-patient-meta.is-compact {
-  justify-content: flex-end;
-  padding-top: 0;
-  padding-bottom: 0.55rem;
-  border-top: none;
   background: transparent;
+  min-width: 0;
 }
 
 .clinic-patient-contact {
@@ -1395,6 +1373,8 @@ select {
   align-self: center;
   gap: 0.55rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .clinic-patient-checked {
@@ -2463,6 +2443,15 @@ select {
   .clinic-board-pane {
     height: auto;
     min-height: 12rem;
+  }
+  .clinic-patient-list {
+    max-height: 11.5rem;
+    min-height: 9.5rem;
+  }
+  .clinic-patient-row {
+    flex-basis: auto;
+    min-height: 8.75rem;
+    max-height: none;
   }
   .brief-layout {
     min-height: 0;
