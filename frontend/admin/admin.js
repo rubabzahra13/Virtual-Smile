@@ -1473,65 +1473,103 @@
   }
 
   /* ── Reports ────────────────────────────────────────── */
+  /*
+   * Two-tier caching strategy for the reports list:
+   *
+   *  Tier 1 – rawReportsCache: keyed by the search query "q" only.
+   *            Stores the full unfiltered/unsorted list returned by the API.
+   *            An API call is triggered ONLY when "q" changes.
+   *
+   *  Tier 2 – apply band, dateFilter, and sort entirely client-side from
+   *            the raw cache. Zero network round-trips for those controls.
+   *
+   * This makes sorting, status filters, and date filters feel instantaneous.
+   */
+  const rawReportsCache = new Map(); // rawKey -> { items, at }
+
+  function applyReportsFilters(rawItems, { band, dateFilter, sort, order }) {
+    let items = Array.isArray(rawItems) ? rawItems : [];
+    if (band && band !== "all") {
+      items = items.filter((r) => reportBandKey(r.overall_score) === band);
+    }
+    if (dateFilter && dateFilter !== "all") {
+      items = items.filter((r) => reportInDateFilter(r.created_at, dateFilter));
+    }
+    items = sortReportItems(items, sort || "created_at", order || "desc");
+    return items;
+  }
+
   async function loadReports(opts = {}) {
     const soft = !!opts.soft;
     const q = $("#reports-q").value.trim();
     const [sort, order] = ($("#reports-sort").value || "created_at:desc").split(":");
     const band = $("#reports-band")?.value || "all";
     const dateFilter = $("#reports-date")?.value || "all";
-    const params = new URLSearchParams({
-      sort: sort === "email" ? "email" : sort === "overall_score" ? "overall_score" : "created_at",
-      order: order || "desc",
-      q,
-      limit: "200",
-    });
-    const queryKey = `${params}|${band}|${dateFilter}|${sort}:${order}`;
+
+    // The view key encodes every dimension that affects the rendered list.
+    const viewKey = `q=${q}|band=${band}|date=${dateFilter}|sort=${sort}:${order}`;
+    // The raw key is used only for the API call – excludes client-side params.
+    const rawKey = q; // keyed by search term only (client-side filters excluded)
+
     const list = $("#reports-list");
     if (!list) return;
-    const cached = listCache.get(queryKey);
-    const hasRows = !!list.querySelector(".report-row:not(.report-row-skel)");
-    const queryChanged = reportsPager.queryKey !== queryKey;
 
-    if (!soft && cached?.items) {
-      if (queryChanged) reportsPager.page = 1;
-      reportsPager.queryKey = queryKey;
-      reportsPager.items = cached.items;
-      if (!hasRows || list.innerHTML.trim() === "") {
-        renderReportsPage();
+    const viewChanged = reportsPager.queryKey !== viewKey;
+
+    // ── Fast path: raw data already in memory → filter/sort client-side instantly ──
+    const rawCached = rawReportsCache.get(rawKey);
+    if (rawCached) {
+      const items = applyReportsFilters(rawCached.items, { band, dateFilter, sort, order });
+      if (viewChanged) reportsPager.page = 1;
+      reportsPager.queryKey = viewKey;
+      reportsPager.items = items;
+      renderReportsPage();
+
+      if (!soft && Date.now() - rawCached.at > 60_000) {
+        // Background-refresh stale data without blocking the UI.
+        _refreshRawReports(rawKey, q, { band, dateFilter, sort, order, viewKey });
       }
-    } else if (!soft && !hasRows) {
-      list.innerHTML = reportsSkeletonHtml();
-      updateSheetPager("reports", null);
+      return;
     }
+
+    // ── Slow path: first load or search changed → fetch from API ──
+    if (!soft) {
+      const hasRows = !!list.querySelector(".report-row:not(.report-row-skel)");
+      if (!hasRows) {
+        list.innerHTML = reportsSkeletonHtml();
+        updateSheetPager("reports", null);
+      }
+    }
+
+    await _refreshRawReports(rawKey, q, { band, dateFilter, sort, order, viewKey });
+  }
+
+  async function _refreshRawReports(rawKey, q, { band, dateFilter, sort, order, viewKey }) {
+    const list = $("#reports-list");
+    if (!list) return;
+
+    const params = new URLSearchParams({ q: q || "", limit: "200" });
 
     try {
       const data = await api(`/admin/api/reports?${params}`);
-      let items = Array.isArray(data.items) ? data.items : [];
-      if (band !== "all") {
-        items = items.filter((r) => reportBandKey(r.overall_score) === band);
-      }
-      if (dateFilter !== "all") {
-        items = items.filter((r) => reportInDateFilter(r.created_at, dateFilter));
-      }
-      items = sortReportItems(items, sort, order || "desc");
+      const rawItems = Array.isArray(data.items) ? data.items : [];
 
-      const fp = listFingerprint(items) + `|${band}|${dateFilter}|${sort}:${order}`;
-      if (cached && cached.fingerprint === fp) {
-        cached.at = Date.now();
-        if (queryChanged) reportsPager.page = 1;
-        reportsPager.queryKey = queryKey;
-        reportsPager.items = cached.items || items;
-        if (!hasRows) renderReportsPage();
-        else hydrateReportThumbs(list);
-        prefetchReportThumbs(pageSlice(reportsPager.items, reportsPager.page).slice);
-        return;
+      // Store raw unfiltered items.
+      rawReportsCache.set(rawKey, { items: rawItems, at: Date.now() });
+      // Trim cache to avoid unbounded growth.
+      if (rawReportsCache.size > 20) {
+        const oldestKey = rawReportsCache.keys().next().value;
+        rawReportsCache.delete(oldestKey);
       }
-      if (queryChanged || reportsPager.queryKey !== queryKey) reportsPager.page = 1;
-      reportsPager.queryKey = queryKey;
+
+      const items = applyReportsFilters(rawItems, { band, dateFilter, sort, order });
+      const viewChanged = reportsPager.queryKey !== viewKey;
+      if (viewChanged) reportsPager.page = 1;
+      reportsPager.queryKey = viewKey;
       reportsPager.items = items;
-      listCache.set(queryKey, { items, fingerprint: fp, at: Date.now() });
       renderReportsPage();
 
+      // Prefetch detail for top rows.
       items.slice(0, 2).forEach((r) => {
         if (r?.id && !getCachedDetail(r.id) && !detailInflight.has(r.id) && detailInflight.size < 2) {
           fetchReportDetail(r.id).catch(() => {});
