@@ -127,16 +127,23 @@
           </div>
 
           <div class="panel is-active" id="step-details" data-panel="1">
-            <span class="app-step-meta">Step 1 of 3 · Contact</span>
+            <span class="app-step-meta">Step 1 of 3 · Patient Info</span>
             <h3>Before we begin</h3>
-            <p class="panel-lead">We’ll save your assessment so your dentist can review it ahead of your visit.</p>
+            <p class="panel-lead">Please provide your details so your dentist can review your assessment ahead of your visit.</p>
             <form id="details-form" class="details-form">
               <div class="field-group">
+                <label class="field" for="user-name">
+                  <span class="field-label">Full Name</span>
+                  <input type="text" id="user-name" name="name" required placeholder="e.g. Muhammad Ali" autocomplete="name" />
+                  <span class="field-feedback" id="name-feedback" aria-live="polite"></span>
+                </label>
+
                 <label class="field" for="user-email">
-                  <span class="field-label">Email</span>
+                  <span class="field-label">Email address</span>
                   <input type="email" id="user-email" name="email" required placeholder="you@email.com" autocomplete="email" />
                   <span class="field-feedback" id="email-feedback" aria-live="polite"></span>
                 </label>
+
                 <label class="field" for="user-phone">
                   <span class="field-label">Mobile number</span>
                   <span class="phone-input-row">
@@ -144,6 +151,42 @@
                     <input type="tel" id="user-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
                   </span>
                   <span class="field-feedback" id="phone-feedback" aria-live="polite"></span>
+                </label>
+
+                <div class="field-row-split">
+                  <label class="field" for="user-gender">
+                    <span class="field-label">Gender</span>
+                    <select id="user-gender" name="gender" required>
+                      <option value="">Select gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <span class="field-feedback" id="gender-feedback" aria-live="polite"></span>
+                  </label>
+
+                  <label class="field" for="user-age">
+                    <span class="field-label">Age</span>
+                    <input type="number" id="user-age" name="age" required min="1" max="120" placeholder="e.g. 28" inputmode="numeric" />
+                    <span class="field-feedback" id="age-feedback" aria-live="polite"></span>
+                  </label>
+                </div>
+
+                <div class="field city-autocomplete-field" id="city-autocomplete-wrap">
+                  <span class="field-label">City</span>
+                  <div class="autocomplete-control">
+                    <input type="text" id="user-city" name="city" required placeholder="Search or select city (Pakistan)" autocomplete="off" />
+                    <button type="button" class="autocomplete-toggle" id="city-toggle-btn" aria-label="Toggle city list" tabindex="-1">▼</button>
+                  </div>
+                  <ul class="autocomplete-list" id="city-dropdown-list" hidden role="listbox"></ul>
+                  <span class="field-feedback" id="city-feedback" aria-live="polite"></span>
+                </div>
+
+                <label class="field" id="user-other-city-wrap" for="user-other-city" hidden>
+                  <span class="field-label">Specify City</span>
+                  <input type="text" id="user-other-city" name="other_city" placeholder="Enter your city name" autocomplete="address-level2" />
+                  <span class="field-feedback" id="other-city-feedback" aria-live="polite"></span>
                 </label>
               </div>
               <label class="consent" for="user-consent">
@@ -176,8 +219,8 @@
             <div class="upload-grid">
               <div class="upload-tile is-required" data-upload="front">
                 <div class="upload-meta">
-                  <span class="upload-title">Front smile <em class="upload-badge">Required</em></span>
-                  <span class="upload-hint">Face the camera directly</span>
+                  <span class="upload-title">Front smile photo</span>
+                  <span class="upload-hint">Face the camera directly with a clear, wide smile</span>
                 </div>
                 <div class="upload-drop">
                   <input type="file" id="front-image" class="upload-input upload-input--gallery" accept="image/*" required hidden />
@@ -192,52 +235,6 @@
                     <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add front smile photo">
                       <span class="upload-add-icon" aria-hidden="true">+</span>
                       <span class="upload-add-text">Tap to add front smile</span>
-                    </button>
-                    <button type="button" class="upload-remove" hidden>Remove</button>
-                  </div>
-                </div>
-              </div>
-              <div class="upload-tile" data-upload="left">
-                <div class="upload-meta">
-                  <span class="upload-title">Left</span>
-                  <span class="upload-hint">Optional</span>
-                </div>
-                <div class="upload-drop">
-                  <input type="file" id="left-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
-                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="user" hidden aria-hidden="true" />
-                  <div class="upload-media">
-                    <span class="upload-example" aria-hidden="true">
-                      <img src="/static/assets/example-left.png" alt="" />
-                      <span class="upload-example-tag">Example</span>
-                    </span>
-                    <img class="upload-preview" alt="Your left profile photo" hidden />
-                    <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add left photo">
-                      <span class="upload-add-icon" aria-hidden="true">+</span>
-                      <span class="upload-add-text">Add photo</span>
-                    </button>
-                    <button type="button" class="upload-remove" hidden>Remove</button>
-                  </div>
-                </div>
-              </div>
-              <div class="upload-tile" data-upload="right">
-                <div class="upload-meta">
-                  <span class="upload-title">Right</span>
-                  <span class="upload-hint">Optional</span>
-                </div>
-                <div class="upload-drop">
-                  <input type="file" id="right-image" class="upload-input upload-input--gallery" accept="image/*" hidden />
-                  <input type="file" class="upload-input upload-input--camera" accept="image/*" capture="user" hidden aria-hidden="true" />
-                  <div class="upload-media">
-                    <span class="upload-example" aria-hidden="true">
-                      <img src="/static/assets/example-right.png" alt="" />
-                      <span class="upload-example-tag">Example</span>
-                    </span>
-                    <img class="upload-preview" alt="Your right profile photo" hidden />
-                    <span class="upload-ready-tag" hidden>Uploaded</span>
-                    <button type="button" class="upload-add-overlay" data-open-photo-source aria-label="Add right photo">
-                      <span class="upload-add-icon" aria-hidden="true">+</span>
-                      <span class="upload-add-text">Add photo</span>
                     </button>
                     <button type="button" class="upload-remove" hidden>Remove</button>
                   </div>
@@ -275,6 +272,36 @@
               <div class="scores-block" id="scores-block">
                 <h4 class="scores-block-title">Category breakdown</h4>
                 <div class="category-scores" id="category-scores"></div>
+              </div>
+            </div>
+
+            <div class="report-block patient-info-block" id="patient-info-block">
+              <h4 class="patient-info-title">Patient Profile</h4>
+              <div class="patient-info-grid">
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">Full Name</span>
+                  <span class="patient-info-val" id="report-patient-name">-</span>
+                </div>
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">Email</span>
+                  <span class="patient-info-val" id="report-patient-email">-</span>
+                </div>
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">Mobile</span>
+                  <span class="patient-info-val" id="report-patient-phone">-</span>
+                </div>
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">Gender</span>
+                  <span class="patient-info-val" id="report-patient-gender">-</span>
+                </div>
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">Age</span>
+                  <span class="patient-info-val" id="report-patient-age">-</span>
+                </div>
+                <div class="patient-info-cell">
+                  <span class="patient-info-label">City</span>
+                  <span class="patient-info-val" id="report-patient-city">-</span>
+                </div>
               </div>
             </div>
 
@@ -436,6 +463,20 @@
             <input type="tel" id="book-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" readonly disabled />
           </span>
           <span class="field-feedback" id="book-phone-feedback" aria-live="polite"></span>
+        </label>
+        <div class="field-row-split">
+          <label class="field" for="book-gender">
+            <span class="field-label">Gender</span>
+            <input type="text" id="book-gender" name="gender" readonly disabled placeholder="—" />
+          </label>
+          <label class="field" for="book-age">
+            <span class="field-label">Age</span>
+            <input type="text" id="book-age" name="age" readonly disabled placeholder="—" />
+          </label>
+        </div>
+        <label class="field" for="book-city">
+          <span class="field-label">City</span>
+          <input type="text" id="book-city" name="city" readonly disabled placeholder="—" />
         </label>
         <div class="book-schedule">
           <div class="field book-picker-field">

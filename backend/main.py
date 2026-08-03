@@ -267,6 +267,12 @@ async def analyze(
     two_pass: Optional[str] = Form(None),
     email: Optional[str] = Form(None),
     phone: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
+    full_name: Optional[str] = Form(None),
+    fullName: Optional[str] = Form(None),
+    gender: Optional[str] = Form(None),
+    age: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
 ):
     provider = provider.lower().strip()
     if provider not in MODEL_OPTIONS:
@@ -274,6 +280,16 @@ async def analyze(
             status_code=400,
             detail=f"Unknown provider '{provider}'. Choose from: {list(MODEL_OPTIONS)}",
         )
+
+    patient_name = (full_name or fullName or name or "").strip()
+    gender_v = (gender or "").strip()
+    city_v = (city or "").strip()
+    age_v = None
+    if age is not None and str(age).strip():
+        try:
+            age_v = int(str(age).strip())
+        except ValueError:
+            pass
 
     default_model = DEFAULT_ANALYSIS_MODEL if provider == "gemini" else MODEL_OPTIONS[provider][0]
     selected_model = model.strip() if model else default_model
@@ -305,8 +321,19 @@ async def analyze(
         use_two_pass = two_pass.lower() in ("1", "true", "yes")
 
     if db_ready():
-        if not (email or "").strip() or not (phone or "").strip():
-            raise HTTPException(status_code=400, detail="Email and phone are required.")
+        if not patient_name:
+            raise HTTPException(status_code=400, detail="Full Name is required.")
+        if not (email or "").strip():
+            raise HTTPException(status_code=400, detail="Valid Email Address is required.")
+        if not gender_v:
+            raise HTTPException(status_code=400, detail="Gender is required.")
+        if age_v is None or not (1 <= age_v <= 120):
+            raise HTTPException(status_code=400, detail="Age must be a valid number between 1 and 120.")
+        if not city_v:
+            raise HTTPException(status_code=400, detail="City is required.")
+        if not (phone or "").strip():
+            raise HTTPException(status_code=400, detail="Mobile phone is required.")
+
         elig = check_eligibility(email or "", phone or "")
         if not elig.get("ok"):
             raise HTTPException(status_code=409, detail=elig.get("reason") or "You have already taken an assessment.")
@@ -342,10 +369,19 @@ async def analyze(
         payload = json.loads(json.dumps(cached_payload))
         payload["email"] = email
         payload["phone"] = phone
+        payload["name"] = patient_name
+        payload["fullName"] = patient_name
+        payload["gender"] = gender_v
+        payload["age"] = age_v
+        payload["city"] = city_v
         try:
             saved = persist_assessment(
                 email=email,
                 phone=phone,
+                name=patient_name,
+                gender=gender_v,
+                age=age_v,
+                city=city_v,
                 overall_score=payload.get("overall_score"),
                 category_scores=payload.get("category_scores"),
                 findings=payload.get("findings"),
@@ -409,8 +445,13 @@ async def analyze(
         "pipeline": result["pipeline"],
         "two_pass": use_two_pass,
         "images_used": len(images),
+        "name": patient_name,
+        "fullName": patient_name,
         "email": email,
         "phone": phone,
+        "gender": gender_v,
+        "age": age_v,
+        "city": city_v,
         "report_text": report_text,
         "parsed_ok": scoring_result["parsed_ok"],
         "overall_score": scoring_result["overall_score"],
@@ -431,6 +472,10 @@ async def analyze(
         saved = persist_assessment(
             email=email,
             phone=phone,
+            name=patient_name,
+            gender=gender_v,
+            age=age_v,
+            city=city_v,
             overall_score=scoring_result.get("overall_score"),
             category_scores=scoring_result.get("category_scores"),
             findings=scoring_result.get("findings"),

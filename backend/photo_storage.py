@@ -166,3 +166,16 @@ def signed_photo_urls(report: dict[str, Any]) -> dict[str, Optional[str]]:
     ):
         out[key] = signed_url_for_path(str(report.get(col) or ""))
     return out
+
+
+def download_assessment_photo_bytes(path: str) -> Optional[bytes]:
+    """Download photo raw bytes from Supabase Storage by object path."""
+    clean = str(path or "").strip()
+    if not clean:
+        return None
+    try:
+        sb = get_supabase()
+        return sb.storage.from_(BUCKET).download(clean)
+    except Exception:
+        logger.exception("Could not download assessment photo bytes for %s", clean)
+        return None

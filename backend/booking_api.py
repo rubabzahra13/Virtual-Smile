@@ -8,7 +8,7 @@ from datetime import date as date_cls
 from datetime import datetime
 from typing import Any, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from admin_auth import issue_token, require_admin
@@ -20,8 +20,18 @@ from db import (
     normalize_email,
     normalize_phone,
 )
-from email_report import send_assessment_email, send_booking_email, send_cancellation_email
-from photo_storage import signed_photo_urls, signed_url_for_path, upload_assessment_photos
+from email_report import (
+    build_report_pdf_bytes,
+    send_assessment_email,
+    send_booking_email,
+    send_cancellation_email,
+)
+from photo_storage import (
+    download_assessment_photo_bytes,
+    signed_photo_urls,
+    signed_url_for_path,
+    upload_assessment_photos,
+)
 from slots import free_slots_for_date, generate_slots_for_date, month_availability, pick_schedule_for_date
 
 logger = logging.getLogger(__name__)
@@ -101,14 +111,23 @@ class LoginBody(BaseModel):
 
 
 class BookingCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=80)
+    name: Optional[str] = Field(None, max_length=80)
+    fullName: Optional[str] = Field(None, max_length=80)
     email: str = Field(..., min_length=3, max_length=120)
-    phone: str = Field(..., min_length=7, max_length=30)
+    phone: Optional[str] = Field(None, max_length=30)
+    gender: Optional[str] = Field(None, max_length=40)
+    age: Optional[int] = Field(None, ge=1, le=120)
+    city: Optional[str] = Field(None, max_length=100)
     date: str = Field(..., description="YYYY-MM-DD")
     time: str = Field(..., description="HH:MM or 12:00 PM")
     note: Optional[str] = Field(None, max_length=1000)
     assessment_id: Optional[str] = None
     source: Literal["patient", "admin"] = "patient"
+
+    @property
+    def patient_name(self) -> str:
+        val = self.fullName or self.name or ""
+        return val.strip()
 
 
 class BookingPatch(BaseModel):
@@ -118,6 +137,12 @@ class BookingPatch(BaseModel):
     time: Optional[str] = None
     note: Optional[str] = None
     name: Optional[str] = None
+    fullName: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    city: Optional[str] = None
 
 
 class ScheduleBody(BaseModel):
@@ -267,6 +292,10 @@ def persist_assessment(
     findings: Any,
     report_text: str,
     images: Optional[list] = None,
+    name: Optional[str] = None,
+    gender: Optional[str] = None,
+    age: Optional[int] = None,
+    city: Optional[str] = None,
 ) -> Optional[dict]:
     """Insert assessment + email report. Returns row or None if DB not configured."""
     if not db_ready():
@@ -287,6 +316,10 @@ def persist_assessment(
     row = {
         "email": email_n,
         "phone": phone_n,
+        "name": (name or "").strip() or None,
+        "gender": (gender or "").strip() or None,
+        "age": age if isinstance(age, int) and 1 <= age <= 120 else None,
+        "city": (city or "").strip() or None,
         "overall_score": overall_score,
         "category_scores": category_scores,
         "findings": findings,
@@ -303,7 +336,20 @@ def persist_assessment(
                 status_code=409,
                 detail="You have already taken an assessment with this email or mobile number.",
             ) from e
-        raise
+        elif "column" in msg or "42703" in msg:
+            fallback_row = {
+                "email": email_n,
+                "phone": phone_n,
+                "overall_score": overall_score,
+                "category_scores": category_scores,
+                "findings": findings,
+                "report_text": report_text,
+                "concerns": concerns,
+                "treatments": treatments,
+            }
+            res = sb.table("assessments").insert(fallback_row).execute()
+        else:
+            raise
 
     data = (res.data or [None])[0]
     if not data:
@@ -324,6 +370,10 @@ def persist_assessment(
         report_text=report_text or "",
         category_scores=category_scores,
         images=images,
+        name=name,
+        gender=gender,
+        age=age,
+        city=city,
     )
     if sent:
         try:
@@ -373,8 +423,11 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
     day = parse_date_input(body.date)
     slot = parse_time_input(body.time)
     email_n = normalize_email(body.email)
-    phone_n = normalize_phone(body.phone)
-    name = body.name.strip()
+    phone_n = normalize_phone(body.phone) if body.phone else ""
+    name = (body.patient_name or body.name or body.fullName or "").strip()
+    gender = (body.gender or "").strip() or None
+    age = body.age if isinstance(body.age, int) and 1 <= body.age <= 120 else None
+    city = (body.city or "").strip() or None
 
     existing = find_confirmed_booking(email=email_n, phone=phone_n)
     if existing:
@@ -415,6 +468,9 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
         "name": name,
         "email": email_n,
         "phone": phone_n,
+        "gender": gender,
+        "age": age,
+        "city": city,
         "date": day,
         "time": slot,
         "note": (body.note or "").strip() or None,
@@ -431,7 +487,21 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
                 status_code=409,
                 detail="That slot was just booked by someone else. Please pick another time.",
             ) from e
-        raise
+        elif "column" in msg or "42703" in msg:
+            fallback_row = {
+                "assessment_id": body.assessment_id or None,
+                "name": name,
+                "email": email_n,
+                "phone": phone_n,
+                "date": day,
+                "time": slot,
+                "note": (body.note or "").strip() or None,
+                "source": source,
+                "status": "confirmed",
+            }
+            res = sb.table("bookings").insert(fallback_row).execute()
+        else:
+            raise
     data = (res.data or [None])[0]
     if not data:
         raise HTTPException(status_code=500, detail="Booking could not be created.")
@@ -562,7 +632,7 @@ def admin_stats(_: str = Depends(require_admin)):
         ).data or []
         bookings = (
             sb.table("bookings")
-            .select("id,status,name,email,phone,date,time,note,source,assessment_id,created_at")
+            .select("id,status,name,email,phone,gender,age,city,date,time,note,source,assessment_id,created_at")
             .execute()
         ).data or []
         return assessments, bookings
@@ -680,6 +750,9 @@ def admin_stats(_: str = Depends(require_admin)):
             "name": b.get("name"),
             "email": b.get("email"),
             "phone": b.get("phone"),
+            "gender": b.get("gender"),
+            "age": b.get("age"),
+            "city": b.get("city"),
             "date": b.get("date"),
             "time": str(b.get("time") or "")[:5],
             "note": b.get("note"),
@@ -727,10 +800,7 @@ def admin_reports(
 
     def _fetch():
         sb = get_supabase()
-        query = sb.table("assessments").select(
-            "id,email,phone,overall_score,concerns,treatments,email_sent_at,created_at,"
-            "photo_front_path,bookings(name,created_at,status,date,time)"
-        )
+        query = sb.table("assessments").select("*")
         query = query.order(sort_col, desc=not ascending).limit(limit)
         return list((query.execute()).data or [])
 
@@ -761,10 +831,12 @@ def admin_reports(
                 ts = datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp()
             except Exception:
                 ts = 0.0
-            # Confirmed first, then newest
             return (0 if b.get("status") == "confirmed" else 1, -ts)
 
-        name = ""
+        name = (row.get("name") or "").strip()
+        gender = (row.get("gender") or "").strip() or None
+        age = row.get("age")
+        city = (row.get("city") or "").strip() or None
         appointment_date = None
         appointment_time = None
         booking_rows = sorted(
@@ -775,7 +847,13 @@ def admin_reports(
             candidate = str(booking.get("name") or "").strip()
             if candidate and not name:
                 name = candidate
-        # Prefer confirmed with a date, then any booking with a date.
+            if booking.get("gender") and not gender:
+                gender = str(booking.get("gender")).strip()
+            if booking.get("age") and not age:
+                age = booking.get("age")
+            if booking.get("city") and not city:
+                city = str(booking.get("city")).strip()
+
         for booking in booking_rows:
             day = str(booking.get("date") or "").strip() or None
             slot = str(booking.get("time") or "").strip() or None
@@ -793,6 +871,9 @@ def admin_reports(
             "email": row.get("email"),
             "phone": row.get("phone"),
             "name": name or None,
+            "gender": gender,
+            "age": age,
+            "city": city,
             "overall_score": row.get("overall_score"),
             "concerns": row.get("concerns") or [],
             "treatments": row.get("treatments") or [],
@@ -806,12 +887,90 @@ def admin_reports(
         if qn:
             blob = (
                 f"{item.get('name') or ''} {item.get('email') or ''} "
-                f"{item.get('phone') or ''} {' '.join(item.get('concerns') or [])}"
+                f"{item.get('phone') or ''} {item.get('city') or ''} {item.get('gender') or ''} {' '.join(item.get('concerns') or [])}"
             ).lower()
             if qn not in blob:
                 continue
         filtered.append(item)
     return {"items": filtered}
+
+
+@admin_router.get("/patients")
+def admin_patients(
+    _: str = Depends(require_admin),
+    q: str = Query(""),
+    limit: int = Query(200, ge=1, le=500),
+):
+    _require_db()
+    sb = get_supabase()
+    assessments_data = []
+    bookings_data = []
+    try:
+        assessments_data = (sb.table("assessments").select("*").order("created_at", desc=True).limit(limit).execute()).data or []
+    except Exception:
+        pass
+    try:
+        bookings_data = (sb.table("bookings").select("*").order("created_at", desc=True).limit(limit).execute()).data or []
+    except Exception:
+        pass
+
+    patients_map: dict[str, dict] = {}
+    for a in assessments_data:
+        key = normalize_email(a.get("email")) or normalize_phone(a.get("phone")) or str(a.get("id"))
+        if not key:
+            continue
+        patients_map[key] = {
+            "id": a.get("id"),
+            "assessment_id": a.get("id"),
+            "name": (a.get("name") or "").strip(),
+            "fullName": (a.get("name") or "").strip(),
+            "email": a.get("email") or "",
+            "phone": a.get("phone") or "",
+            "gender": a.get("gender") or "",
+            "age": a.get("age"),
+            "city": a.get("city") or "",
+            "created_at": a.get("created_at"),
+        }
+
+    for b in bookings_data:
+        key = normalize_email(b.get("email")) or normalize_phone(b.get("phone")) or str(b.get("id"))
+        if not key:
+            continue
+        if key not in patients_map:
+            patients_map[key] = {
+                "id": b.get("id"),
+                "assessment_id": b.get("assessment_id"),
+                "name": (b.get("name") or "").strip(),
+                "fullName": (b.get("name") or "").strip(),
+                "email": b.get("email") or "",
+                "phone": b.get("phone") or "",
+                "gender": b.get("gender") or "",
+                "age": b.get("age"),
+                "city": b.get("city") or "",
+                "created_at": b.get("created_at"),
+            }
+        else:
+            p = patients_map[key]
+            if not p.get("name") and b.get("name"):
+                p["name"] = b["name"].strip()
+                p["fullName"] = b["name"].strip()
+            if not p.get("gender") and b.get("gender"):
+                p["gender"] = b["gender"]
+            if not p.get("age") and b.get("age"):
+                p["age"] = b["age"]
+            if not p.get("city") and b.get("city"):
+                p["city"] = b["city"]
+            if not p.get("assessment_id") and b.get("assessment_id"):
+                p["assessment_id"] = b["assessment_id"]
+
+    patient_list = list(patients_map.values())
+    qn = q.strip().lower()
+    if qn:
+        patient_list = [
+            p for p in patient_list
+            if qn in f"{p.get('name','')} {p.get('email','')} {p.get('phone','')} {p.get('city','')} {p.get('gender','')}".lower()
+        ]
+    return {"items": patient_list}
 
 
 @admin_router.get("/reports/{report_id}")
@@ -834,11 +993,9 @@ def admin_report_detail(report_id: str, _: str = Depends(require_admin)):
         rows = list(by_id.data or [])
         if rows:
             return by_id
-        # Fallback: match by patient email/phone when assessment_id was never stored.
         email_n = normalize_email((report or {}).get("email") or "")
         phone_n = normalize_phone((report or {}).get("phone") or "")
         query = sb.table("bookings").select("*").order("created_at", desc=True).limit(20)
-        # Prefer email match when available.
         if email_n:
             return query.eq("email", email_n).execute()
         if phone_n:
@@ -871,6 +1028,67 @@ def admin_report_detail(report_id: str, _: str = Depends(require_admin)):
     return {"report": report, "bookings": bookings, "photos": photos}
 
 
+@admin_router.get("/reports/{report_id}/pdf")
+def admin_report_pdf(report_id: str, _: str = Depends(require_admin)):
+    _require_db()
+
+    def _load_report():
+        sb = get_supabase()
+        return sb.table("assessments").select("*").eq("id", report_id).limit(1).execute()
+
+    try:
+        res = db_retry(_load_report, label="admin report pdf detail")
+    except Exception:
+        logger.exception("Admin report pdf detail failed for %s", report_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Could not load assessment for PDF. Please try again.",
+        )
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Report not found.")
+
+    report = res.data[0]
+
+    # Fetch stored photos if available
+    images: list[tuple[str, bytes]] = []
+    for label, col in (
+        ("Front smile", "photo_front_path"),
+        ("Left smile", "photo_left_path"),
+        ("Right smile", "photo_right_path"),
+    ):
+        path = str(report.get(col) or "").strip()
+        if path:
+            raw = download_assessment_photo_bytes(path)
+            if raw:
+                images.append((label, raw))
+
+    try:
+        pdf_bytes = build_report_pdf_bytes(
+            overall_score=report.get("overall_score"),
+            category_scores=report.get("category_scores"),
+            findings=report.get("findings"),
+            images=images if images else None,
+            name=report.get("name"),
+            email=report.get("email"),
+            gender=report.get("gender"),
+            age=report.get("age"),
+            city=report.get("city"),
+        )
+    except Exception:
+        logger.exception("Failed to build PDF report for %s", report_id)
+        raise HTTPException(status_code=500, detail="Failed to generate PDF report.")
+
+    filename = f"virtual-smile-assessment-report-{report_id[:8]}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
 @admin_router.get("/bookings")
 def admin_bookings(
     _: str = Depends(require_admin),
@@ -890,7 +1108,6 @@ def admin_bookings(
         if status == "cancelled":
             query = query.eq("status", "cancelled")
         elif status in {"confirmed", "treated"}:
-            # Subsets of confirmed; treated uses column or [TREATED] note marker.
             query = query.eq("status", "confirmed")
         query = query.order(sort_col, desc=not ascending).limit(limit)
         return query.execute()
@@ -917,10 +1134,9 @@ def admin_bookings(
             r
             for r in rows
             if qn
-            in f"{r.get('name','')} {r.get('email','')} {r.get('phone','')} {r.get('date','')} {r.get('time','')}".lower()
+            in f"{r.get('name','')} {r.get('email','')} {r.get('phone','')} {r.get('city','')} {r.get('gender','')} {r.get('date','')} {r.get('time','')}".lower()
         ]
 
-    # Link bookings to assessments by email/phone when assessment_id is missing.
     try:
         sb = get_supabase()
         assessments = (
@@ -958,8 +1174,18 @@ def admin_patch_booking(
         updates["status"] = body.status
     if body.note is not None:
         updates["note"] = body.note
-    if body.name is not None:
-        updates["name"] = body.name.strip()
+    if body.name is not None or body.fullName is not None:
+        updates["name"] = (body.fullName or body.name or "").strip()
+    if body.email is not None:
+        updates["email"] = normalize_email(body.email)
+    if body.phone is not None:
+        updates["phone"] = normalize_phone(body.phone)
+    if body.gender is not None:
+        updates["gender"] = body.gender.strip()
+    if body.age is not None:
+        updates["age"] = body.age
+    if body.city is not None:
+        updates["city"] = body.city.strip()
     if body.date is not None:
         updates["date"] = parse_date_input(body.date)
     if body.time is not None:

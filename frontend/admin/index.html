@@ -401,6 +401,34 @@
                 <label for="w-email" class="field-label">Email</label>
                 <input id="w-email" type="email" placeholder="patient@email.com" required autocomplete="email" />
               </div>
+              <div class="field-row-split" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="field">
+                  <label for="w-gender" class="field-label">Gender <span class="field-optional">(optional)</span></label>
+                  <select id="w-gender" class="admin-select">
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="w-age" class="field-label">Age <span class="field-optional">(optional)</span></label>
+                  <input id="w-age" type="number" min="1" max="120" placeholder="e.g. 28" inputmode="numeric" />
+                </div>
+              </div>
+              <div class="field city-autocomplete-field" id="w-city-autocomplete-wrap" style="position:relative;">
+                <label for="w-city" class="field-label">City <span class="field-optional">(optional)</span></label>
+                <div class="autocomplete-control">
+                  <input type="text" id="w-city" placeholder="Search or select city (Pakistan)" autocomplete="off" />
+                  <button type="button" class="autocomplete-toggle" id="w-city-toggle-btn" aria-label="Toggle city list" tabindex="-1">▼</button>
+                </div>
+                <ul class="autocomplete-list" id="w-city-dropdown-list" hidden role="listbox"></ul>
+              </div>
+              <div class="field" id="w-other-city-wrap" hidden>
+                <label for="w-other-city" class="field-label">Specify City</label>
+                <input type="text" id="w-other-city" placeholder="Enter city name" />
+              </div>
               <div class="field">
                 <label for="w-note" class="field-label">Details <span class="field-optional">(optional)</span></label>
                 <textarea id="w-note" placeholder="Any notes about the visit…" rows="4"></textarea>
@@ -556,6 +584,10 @@
           </div>
         </div>
         <div class="pm-header-actions">
+          <a id="pm-view-pdf-btn" class="pm-view-pdf-btn" href="#" target="_blank" rel="noopener" hidden title="View patient assessment PDF report">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span>View PDF</span>
+          </a>
           <div id="pm-header-appt-actions" class="pm-header-appt-actions" hidden></div>
           <button type="button" class="pm-close-btn" data-close-patient-modal aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

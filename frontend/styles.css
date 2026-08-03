@@ -1073,9 +1073,13 @@ body.flow-open .hero-shell.is-assessing .hero-card {
   letter-spacing: 0.01em;
 }
 
+.details-form input[type="text"],
 .details-form input[type="email"],
 .details-form input[type="tel"],
+.details-form input[type="number"],
+.details-form select,
 .chat-form input {
+  width: 100%;
   border: 1px solid rgba(32, 64, 136, 0.14);
   border-radius: 16px;
   padding: 0.95rem 1.05rem;
@@ -1085,19 +1089,31 @@ body.flow-open .hero-shell.is-assessing .hero-card {
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
-.details-form input[type="email"]::placeholder,
-.details-form input[type="tel"]::placeholder,
+.details-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23204088' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.05rem center;
+  padding-right: 2.5rem;
+  cursor: pointer;
+}
+
+.details-form input::placeholder,
 .chat-form input::placeholder {
   color: var(--grey-mid);
 }
 
 .details-form input:hover,
+.details-form select:hover,
 .chat-form input:hover {
   background: var(--white);
   border-color: rgba(0, 152, 152, 0.35);
 }
 
 .details-form input:focus,
+.details-form select:focus,
 .chat-form input:focus {
   outline: none;
   background: var(--white);
@@ -1276,9 +1292,11 @@ body.flow-open .hero-shell.is-assessing .hero-card {
 }
 
 .upload-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
 }
 
 .upload-tile {
@@ -1286,8 +1304,10 @@ body.flow-open .hero-shell.is-assessing .hero-card {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  width: 100%;
+  max-width: 440px;
   min-height: 0;
-  padding: 0.75rem;
+  padding: 0.85rem;
   border: 1px solid rgba(32, 64, 136, 0.12);
   border-radius: 22px;
   background: var(--surface);
@@ -4524,3 +4544,136 @@ body.camera-open {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Patient Demographics & City Autocomplete Styling */
+.field-row-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 520px) {
+  .field-row-split {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+.city-autocomplete-field {
+  position: relative;
+  z-index: 50;
+}
+
+.autocomplete-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.autocomplete-control input {
+  width: 100%;
+  padding-right: 2.6rem !important;
+}
+
+.autocomplete-toggle {
+  position: absolute;
+  right: 0.95rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--navy);
+  font-size: 0.7rem;
+  opacity: 0.65;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 9999 !important;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem 0;
+  list-style: none;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(32, 64, 136, 0.22) !important;
+  border-radius: 12px;
+  box-shadow: 0 14px 35px rgba(18, 40, 90, 0.25), 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+.autocomplete-item {
+  padding: 0.6rem 0.95rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #183068 !important;
+  background: #ffffff !important;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.is-highlighted {
+  background: rgba(0, 152, 152, 0.14) !important;
+  color: #006666 !important;
+  font-weight: 700;
+}
+
+.autocomplete-empty {
+  padding: 0.75rem 0.95rem;
+  font-size: 0.85rem;
+  color: #64748b !important;
+  background: #ffffff !important;
+  font-style: italic;
+}
+
+/* Patient Profile Block in Assessment Results */
+.patient-info-block {
+  background: var(--surface);
+  border: 1px solid var(--grey-light);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.patient-info-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--navy-deep);
+}
+
+.patient-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.patient-info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.patient-info-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--grey);
+}
+
+.patient-info-val {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-word;
+}
+

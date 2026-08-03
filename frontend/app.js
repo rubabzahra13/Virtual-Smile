@@ -1,7 +1,11 @@
 (() => {
   const state = {
+    name: "",
     email: "",
     phone: "",
+    gender: "",
+    age: "",
+    city: "",
     assessmentId: null,
     frontFile: null,
     leftFile: null,
@@ -19,6 +23,21 @@
     chatHistory: [],
     photosLocked: false,
   };
+
+  const PAKISTANI_CITIES = [
+    "Abbottabad", "Attock", "Bahawalnagar", "Bahawalpur", "Burewala", "Chakwal",
+    "Chaman", "Chiniot", "Chishtian", "Dadu", "Daska", "Dera Ghazi Khan",
+    "Dera Ismail Khan", "Faisalabad", "Ferozewala", "Gilgit", "Gojra", "Gujranwala",
+    "Gujrat", "Gwadar", "Hafizabad", "Haripur", "Hub", "Hyderabad", "Islamabad",
+    "Jacobabad", "Jaranwala", "Jhelum", "Jhang", "Karachi", "Karianwala", "Kasur",
+    "Khairpur", "Khanewal", "Khanpur", "Khuzdar", "Kohat", "Kot Abdul Malik",
+    "Kotri", "Lahore", "Larkana", "Mandi Bahauddin", "Mardan", "Mirpur (AJK)",
+    "Mirpur Khas", "Mingora", "Multan", "Muridke", "Muzaffarabad", "Muzaffargarh",
+    "Nawabshah", "Okara", "Pakpattan", "Peshawar", "Quetta", "Rahim Yar Khan",
+    "Rawalpindi", "Sadiqabad", "Sahiwal", "Samundri", "Sargodha", "Shahdadkot",
+    "Sheikhupura", "Shikarpur", "Sialkot", "Skardu", "Sukkur", "Tando Adam",
+    "Tando Allahyar", "Turbat", "Vehari", "Wah Cantt", "Other"
+  ];
 
   const FREE_CHAT_LIMIT = 5;
 
@@ -170,9 +189,6 @@
   let cameraFacing = "user"; // default front camera
 
   function uploadKeyForTile(tile) {
-    const kind = tile?.dataset.upload;
-    if (kind === "left") return "leftFile";
-    if (kind === "right") return "rightFile";
     return "frontFile";
   }
 
@@ -365,8 +381,6 @@
   function wireUploads() {
     [
       ["#front-image", "frontFile"],
-      ["#left-image", "leftFile"],
-      ["#right-image", "rightFile"],
     ].forEach(([inputSel, key]) => {
       const gallery = $(inputSel);
       if (!gallery) return;
@@ -811,8 +825,16 @@
     const btn = $("#continue-to-photos");
     if (btn?.disabled) return;
 
+    const name = $("#user-name").value.trim();
     const email = $("#user-email").value.trim();
     const phone = formatPakistaniPhone($("#user-phone").value);
+    const gender = $("#user-gender").value.trim();
+    const age = $("#user-age").value.trim();
+    const rawCity = $("#user-city").value.trim();
+    const otherCityVal = $("#user-other-city") ? $("#user-other-city").value.trim() : "";
+    const matchedCity = PAKISTANI_CITIES.find((c) => c.toLowerCase() === rawCity.toLowerCase()) || rawCity;
+    const city = (matchedCity === "Other" || rawCity.toLowerCase() === "other") ? (otherCityVal || "Other") : matchedCity;
+
     btn.disabled = true;
     const prevLabel = btn.textContent;
     btn.textContent = "Checking…";
@@ -831,8 +853,12 @@
         updateContinueEnabled(true);
         return;
       }
+      state.name = name;
       state.email = email;
       state.phone = phone;
+      state.gender = gender;
+      state.age = age;
+      state.city = city;
       btn.textContent = prevLabel;
       showStep(2);
     } catch (_err) {
@@ -875,28 +901,163 @@
     return `+92${digits}`;
   }
 
+  function initCityAutocomplete() {
+    const input = $("#user-city");
+    const list = $("#city-dropdown-list");
+    const toggle = $("#city-toggle-btn");
+    if (!input || !list) return;
+
+    let activeIndex = -1;
+
+    function renderList(items) {
+      if (!items.length) {
+        list.innerHTML = '<li class="autocomplete-empty">No matching Pakistani city</li>';
+        list.hidden = false;
+        return;
+      }
+      list.innerHTML = items
+        .map(
+          (city, idx) =>
+            `<li class="autocomplete-item ${idx === activeIndex ? "is-highlighted" : ""}" data-value="${city}" role="option">${city}</li>`
+        )
+        .join("");
+      list.hidden = false;
+    }
+
+    function filterCities() {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        renderList(PAKISTANI_CITIES);
+        return;
+      }
+      const matches = PAKISTANI_CITIES.filter((c) => c.toLowerCase().includes(q));
+      renderList(matches);
+    }
+
+    input.addEventListener("focus", () => {
+      filterCities();
+    });
+
+    input.addEventListener("input", () => {
+      activeIndex = -1;
+      filterCities();
+      updateContinueEnabled(false);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      const items = list.querySelectorAll(".autocomplete-item");
+      if (!items.length || list.hidden) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+        const currentQuery = input.value.trim().toLowerCase();
+        const matches = currentQuery
+          ? PAKISTANI_CITIES.filter((c) => c.toLowerCase().includes(currentQuery))
+          : PAKISTANI_CITIES;
+        renderList(matches);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        const currentQuery = input.value.trim().toLowerCase();
+        const matches = currentQuery
+          ? PAKISTANI_CITIES.filter((c) => c.toLowerCase().includes(currentQuery))
+          : PAKISTANI_CITIES;
+        renderList(matches);
+      } else if (e.key === "Enter" && activeIndex >= 0) {
+        e.preventDefault();
+        const selected = items[activeIndex]?.dataset?.value;
+        if (selected) {
+          input.value = selected;
+          list.hidden = true;
+          input.dataset.touched = "1";
+          updateContinueEnabled(false);
+        }
+      } else if (e.key === "Escape") {
+        list.hidden = true;
+      }
+    });
+
+    list.addEventListener("click", (e) => {
+      const item = e.target.closest(".autocomplete-item");
+      if (!item) return;
+      input.value = item.dataset.value;
+      list.hidden = true;
+      input.dataset.touched = "1";
+      updateContinueEnabled(false);
+    });
+
+    if (toggle) {
+      toggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (list.hidden) {
+          filterCities();
+        } else {
+          list.hidden = true;
+        }
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#city-autocomplete-wrap")) {
+        list.hidden = true;
+      }
+    });
+  }
+
   function updateContinueEnabled(showErrors = false) {
     const btn = $("#continue-to-photos");
+    const nameInput = $("#user-name");
     const emailInput = $("#user-email");
     const phoneInput = $("#user-phone");
+    const genderInput = $("#user-gender");
+    const ageInput = $("#user-age");
+    const cityInput = $("#user-city");
+    const otherCityWrap = $("#user-other-city-wrap");
+    const otherCityInput = $("#user-other-city");
     const consentInput = $("#user-consent");
-    if (!btn || !emailInput || !phoneInput || !consentInput) return;
+    if (!btn || !nameInput || !emailInput || !phoneInput || !genderInput || !ageInput || !cityInput || !consentInput) return;
 
+    const name = nameInput.value.trim().replace(/\s+/g, " ");
     const email = emailInput.value.trim();
     const phone = phoneInput.value.trim();
+    const gender = genderInput.value.trim();
+    const ageVal = ageInput.value.trim();
+    const city = cityInput.value.trim();
+    const otherCity = otherCityInput ? otherCityInput.value.trim() : "";
     const consent = consentInput.checked;
     const phoneDigits = normalizePakistaniMobile(phone);
 
+    let nameMsg = "";
     let emailMsg = "";
     let phoneMsg = "";
+    let genderMsg = "";
+    let ageMsg = "";
+    let cityMsg = "";
+    let otherCityMsg = "";
     let consentMsg = "";
+
+    let nameOk = false;
     let emailOk = false;
     let phoneOk = false;
+    let genderOk = false;
+    let ageOk = false;
+    let cityOk = false;
+    let otherCityOk = false;
+
+    if (!name) {
+      nameMsg = showErrors || nameInput.dataset.touched === "1" ? "Full Name is required." : "";
+    } else if (name.length < 2) {
+      nameMsg = "Name must be at least 2 characters.";
+      nameInput.dataset.touched = "1";
+    } else {
+      nameOk = true;
+    }
 
     if (!email) {
       emailMsg = showErrors || emailInput.dataset.touched === "1" ? "Email is required." : "";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      emailMsg = "Enter a valid email, e.g. you@email.com.";
+      emailMsg = "Enter a valid email address.";
       emailInput.dataset.touched = "1";
     } else {
       emailOk = true;
@@ -919,6 +1080,51 @@
       phoneOk = true;
     }
 
+    if (!gender) {
+      genderMsg = showErrors || genderInput.dataset.touched === "1" ? "Gender is required." : "";
+    } else {
+      genderOk = true;
+    }
+
+    const ageNum = parseInt(ageVal, 10);
+    if (!ageVal) {
+      ageMsg = showErrors || ageInput.dataset.touched === "1" ? "Age is required." : "";
+    } else if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+      ageMsg = "Enter a valid age between 1 and 120.";
+      ageInput.dataset.touched = "1";
+    } else {
+      ageOk = true;
+    }
+
+    const matchedCity = PAKISTANI_CITIES.find((c) => c.toLowerCase() === city.toLowerCase());
+    const isOtherSelected = matchedCity === "Other" || city.toLowerCase() === "other";
+
+    if (otherCityWrap) {
+      otherCityWrap.hidden = !isOtherSelected;
+    }
+
+    if (!city) {
+      cityMsg = showErrors || cityInput.dataset.touched === "1" ? "City is required." : "";
+    } else if (!matchedCity) {
+      cityMsg = "Please select a city from the list or select 'Other'.";
+      cityInput.dataset.touched = "1";
+    } else {
+      cityOk = true;
+    }
+
+    if (isOtherSelected) {
+      if (!otherCity) {
+        otherCityMsg = showErrors || (otherCityInput && otherCityInput.dataset.touched === "1") ? "Please specify your city name." : "";
+      } else if (otherCity.length < 2) {
+        otherCityMsg = "City name must be at least 2 characters.";
+        if (otherCityInput) otherCityInput.dataset.touched = "1";
+      } else {
+        otherCityOk = true;
+      }
+    } else {
+      otherCityOk = true;
+    }
+
     if (!consent) {
       consentMsg =
         showErrors || consentInput.dataset.touched === "1"
@@ -935,23 +1141,35 @@
       phoneOk = false;
     }
 
+    setFieldFeedback("#name-feedback", nameMsg, nameOk && !nameMsg);
     setFieldFeedback("#email-feedback", emailMsg, emailOk && !emailMsg);
     setFieldFeedback("#phone-feedback", phoneMsg, phoneOk && !phoneMsg);
+    setFieldFeedback("#gender-feedback", genderMsg, genderOk && !genderMsg);
+    setFieldFeedback("#age-feedback", ageMsg, ageOk && !ageMsg);
+    setFieldFeedback("#city-feedback", cityMsg, cityOk && !cityMsg);
+    setFieldFeedback("#other-city-feedback", otherCityMsg, otherCityOk && !otherCityMsg);
     setFieldFeedback("#consent-feedback", consentMsg, consent);
 
+    nameInput.classList.toggle("is-invalid", !!nameMsg);
     emailInput.classList.toggle("is-invalid", !!emailMsg);
     phoneInput.classList.toggle("is-invalid", !!phoneMsg);
-    emailInput.closest(".field")?.classList.toggle("is-invalid", !!emailMsg);
-    phoneInput.closest(".field")?.classList.toggle("is-invalid", !!phoneMsg);
+    genderInput.classList.toggle("is-invalid", !!genderMsg);
+    ageInput.classList.toggle("is-invalid", !!ageMsg);
+    cityInput.classList.toggle("is-invalid", !!cityMsg);
+    if (otherCityInput) otherCityInput.classList.toggle("is-invalid", !!otherCityMsg);
     consentInput.closest(".consent")?.classList.toggle("is-invalid", !!consentMsg);
 
-    btn.disabled = !(emailOk && phoneOk && consent);
+    btn.disabled = !(nameOk && emailOk && phoneOk && genderOk && ageOk && cityOk && otherCityOk && consent);
   }
 
-  ["#user-email", "#user-phone"].forEach((sel) => {
+  ["#user-name", "#user-email", "#user-phone", "#user-gender", "#user-age", "#user-city", "#user-other-city"].forEach((sel) => {
     const el = $(sel);
     if (!el) return;
     el.addEventListener("input", () => {
+      clearEligibilityBlock();
+      updateContinueEnabled(false);
+    });
+    el.addEventListener("change", () => {
       clearEligibilityBlock();
       updateContinueEnabled(false);
     });
@@ -961,10 +1179,11 @@
     });
   });
 
+  initCityAutocomplete();
+
   const phoneInputEl = $("#user-phone");
   if (phoneInputEl) {
     phoneInputEl.addEventListener("input", () => {
-      // Keep only digits in the national-number field.
       const cleaned = phoneInputEl.value.replace(/[^\d\s]/g, "");
       if (cleaned !== phoneInputEl.value) phoneInputEl.value = cleaned;
     });
@@ -992,14 +1211,18 @@
 
     const formData = new FormData();
     formData.append("front_image", state.frontFile);
-    if (state.leftFile) formData.append("left_image", state.leftFile);
-    if (state.rightFile) formData.append("right_image", state.rightFile);
     formData.append("provider", state.provider);
     formData.append("model", state.model);
     formData.append("quality_model", state.qualityModel);
     formData.append("two_pass", "true");
+    formData.append("name", state.name);
+    formData.append("full_name", state.name);
+    formData.append("fullName", state.name);
     formData.append("email", state.email);
     formData.append("phone", state.phone);
+    formData.append("gender", state.gender);
+    formData.append("age", state.age);
+    formData.append("city", state.city);
 
     try {
       const res = await fetch("/analyze", { method: "POST", body: formData });
@@ -1035,6 +1258,19 @@
       setScoreRing(state.overallScore);
       renderCategories(state.categoryScores);
       renderPatientFindings(state.findings);
+
+      const rName = $("#report-patient-name");
+      const rEmail = $("#report-patient-email");
+      const rPhone = $("#report-patient-phone");
+      const rGender = $("#report-patient-gender");
+      const rAge = $("#report-patient-age");
+      const rCity = $("#report-patient-city");
+      if (rName) rName.textContent = state.name || data.name || "-";
+      if (rEmail) rEmail.textContent = state.email || data.email || "-";
+      if (rPhone) rPhone.textContent = state.phone || data.phone || "-";
+      if (rGender) rGender.textContent = state.gender || data.gender || "-";
+      if (rAge) rAge.textContent = state.age || data.age || "-";
+      if (rCity) rCity.textContent = state.city || data.city || "-";
 
       const before = $("#sim-before");
       const simBlock = $("#sim-block");
@@ -1934,8 +2170,17 @@
         return;
       }
 
+      const bookName = $("#book-name");
       const email = $("#book-email");
       const phone = $("#book-phone");
+      const gender = $("#book-gender");
+      const age = $("#book-age");
+      const city = $("#book-city");
+
+      if (bookName && state.name) {
+        bookName.value = state.name;
+        bookName.dataset.touched = "1";
+      }
       if (email) {
         email.value = state.email || "";
         email.readOnly = true;
@@ -1950,6 +2195,16 @@
         }
         phone.readOnly = true;
         phone.disabled = true;
+      }
+      if (gender) {
+        gender.value = state.gender || "—";
+      }
+      if (age) {
+        gender.value = state.gender || "—";
+        age.value = state.age ? `${state.age} yrs` : "—";
+      }
+      if (city) {
+        city.value = state.city || "—";
       }
 
       const min = bookMinDate();
@@ -1976,7 +2231,7 @@
       if (success) success.hidden = true;
       modal.hidden = false;
       document.body.classList.add("book-open");
-      $("#book-name")?.focus();
+      if (!bookName?.value) $("#book-name")?.focus();
 
       await renderBookCalendar();
       if (dateInput?.value) await loadBookFreeSlots(dateInput.value);
@@ -2109,7 +2364,7 @@
         return;
       }
       updateBookSubmitEnabled(true);
-      const name = $("#book-name")?.value.trim() || "";
+      const name = $("#book-name")?.value.trim() || state.name || "";
       const email = (state.email || $("#book-email")?.value.trim() || "");
       const phoneRaw = state.phone
         ? String(state.phone).replace(/^\+92/, "").replace(/\D/g, "").replace(/^92/, "")
@@ -2142,8 +2397,12 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name,
+            fullName: name,
             email,
             phone,
+            gender: state.gender || null,
+            age: state.age || null,
+            city: state.city || null,
             date,
             time: time24,
             note: note || null,

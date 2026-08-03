@@ -3,6 +3,21 @@
   const TOKEN_KEY = "vs_admin_token";
   const TAB_KEY   = "vs_admin_tab";
 
+  const PAKISTANI_CITIES = [
+    "Abbottabad", "Attock", "Bahawalnagar", "Bahawalpur", "Burewala", "Chakwal",
+    "Chaman", "Chiniot", "Chishtian", "Dadu", "Daska", "Dera Ghazi Khan",
+    "Dera Ismail Khan", "Faisalabad", "Ferozewala", "Gilgit", "Gojra", "Gujranwala",
+    "Gujrat", "Gwadar", "Hafizabad", "Haripur", "Hub", "Hyderabad", "Islamabad",
+    "Jacobabad", "Jaranwala", "Jhelum", "Jhang", "Karachi", "Karianwala", "Kasur",
+    "Khairpur", "Khanewal", "Khanpur", "Khuzdar", "Kohat", "Kot Abdul Malik",
+    "Kotri", "Lahore", "Larkana", "Mandi Bahauddin", "Mardan", "Mirpur (AJK)",
+    "Mirpur Khas", "Mingora", "Multan", "Muridke", "Muzaffarabad", "Muzaffargarh",
+    "Nawabshah", "Okara", "Pakpattan", "Peshawar", "Quetta", "Rahim Yar Khan",
+    "Rawalpindi", "Sadiqabad", "Sahiwal", "Samundri", "Sargodha", "Shahdadkot",
+    "Sheikhupura", "Shikarpur", "Sialkot", "Skardu", "Sukkur", "Tando Adam",
+    "Tando Allahyar", "Turbat", "Vehari", "Wah Cantt", "Other"
+  ];
+
   const TAB_META = {
     dashboard: {
       eyebrow:  "Overview",
@@ -891,6 +906,7 @@
             <span class="booking-name">${escapeHtml(b.name || "—")}</span>
             <span class="booking-email">${escapeHtml(b.email || "—")}</span>
             <span class="booking-phone">${escapeHtml(b.phone || "—")}</span>
+            ${(b.gender || b.age || b.city) ? `<span class="booking-phone" style="opacity:0.8;font-size:0.72rem;margin-top:2px;color:var(--navy-mid);">${escapeHtml([b.gender, b.age ? `${b.age} yrs` : null, b.city].filter(Boolean).join(" • "))}</span>` : ""}
           </span>
         </span>
         <span class="booking-col booking-col-source">${sourceBadge(b.source)}</span>
@@ -945,6 +961,7 @@
             <span class="report-name">${escapeHtml(name)}</span>
             <span class="report-email">${escapeHtml(email)}</span>
             ${r.phone ? `<span class="report-phone">${escapeHtml(r.phone)}</span>` : `<span class="report-phone is-empty">No phone</span>`}
+            ${(r.gender || r.age || r.city) ? `<span class="report-phone" style="opacity:0.8;font-size:0.72rem;margin-top:2px;color:var(--navy-mid);">${escapeHtml([r.gender, r.age ? `${r.age} yrs` : null, r.city].filter(Boolean).join(" • "))}</span>` : ""}
           </span>
         </span>
         <span class="report-col report-col-score">${reportScoreChip(r.overall_score)}</span>
@@ -1644,6 +1661,11 @@
     openReportOrigin = null;
     photoCarousel = { views: [], index: 0 };
     syncPmTreatBtn(null);
+    const pdfBtn = $("#pm-view-pdf-btn");
+    if (pdfBtn) {
+      pdfBtn.hidden = true;
+      pdfBtn.href = "#";
+    }
     const headerActions = $("#pm-header-appt-actions");
     if (headerActions) {
       headerActions.innerHTML = "";
@@ -1752,6 +1774,9 @@
       name: name && !String(name).includes("@") ? name : "",
       email: r.email || "",
       phone: r.phone || "",
+      gender: r.gender || linked?.gender || "",
+      age: r.age != null ? r.age : (linked?.age != null ? linked.age : ""),
+      city: r.city || linked?.city || "",
       assessmentId: reportId || "",
       note: r.email
         ? `Booked from assessment report${r.overall_score != null ? ` (score ${r.overall_score})` : ""}.`
@@ -1769,6 +1794,12 @@
     if ($("#w-name")) $("#w-name").value = "";
     if ($("#w-email")) $("#w-email").value = "";
     if ($("#w-phone")) $("#w-phone").value = "";
+    if ($("#w-gender")) $("#w-gender").value = "";
+    if ($("#w-age")) $("#w-age").value = "";
+    if ($("#w-city")) $("#w-city").value = "";
+    if ($("#w-other-city")) $("#w-other-city").value = "";
+    if ($("#w-other-city-wrap")) $("#w-other-city-wrap").hidden = true;
+    if ($("#w-city-dropdown-list")) $("#w-city-dropdown-list").hidden = true;
     if ($("#w-note")) $("#w-note").value = "";
     if ($("#w-assessment-id")) $("#w-assessment-id").value = "";
 
@@ -1790,11 +1821,21 @@
     initWalkinBookingUi();
   }
 
-  function fillWalkinForm({ name = "", email = "", phone = "", assessmentId = "", note = "", statusText = "" } = {}) {
+  function fillWalkinForm({ name = "", email = "", phone = "", gender = "", age = "", city = "", assessmentId = "", note = "", statusText = "" } = {}) {
     resetWalkinBookingForm();
     if ($("#w-name")) $("#w-name").value = name || "";
     if ($("#w-email")) $("#w-email").value = email || "";
     if ($("#w-phone")) $("#w-phone").value = phone || "";
+    if ($("#w-gender")) $("#w-gender").value = gender || "";
+    if ($("#w-age")) $("#w-age").value = age != null ? age : "";
+    if ($("#w-city")) {
+      $("#w-city").value = city || "";
+      if (city && !PAKISTANI_CITIES.includes(city)) {
+        $("#w-city").value = "Other";
+        if ($("#w-other-city")) $("#w-other-city").value = city;
+        if ($("#w-other-city-wrap")) $("#w-other-city-wrap").hidden = false;
+      }
+    }
     if ($("#w-assessment-id")) $("#w-assessment-id").value = assessmentId || "";
     if ($("#w-note")) $("#w-note").value = note || "";
     const status = $("#walkin-status");
@@ -1809,6 +1850,9 @@
       name: btn.dataset.name || "",
       email: btn.dataset.email || "",
       phone: btn.dataset.phone || "",
+      gender: btn.dataset.gender || "",
+      age: btn.dataset.age || "",
+      city: btn.dataset.city || "",
       assessmentId: btn.dataset.assessment || "",
       note: btn.dataset.note || "Rebooked after a cancelled appointment.",
       statusText: "Patient details filled. Pick a new date and time.",
@@ -2316,6 +2360,20 @@
                 <div class="pm-patient-contact">${escapeHtml(r.phone || "—")}</div>
               </div>
             </div>
+            <div class="pm-patient-demographics">
+              <div class="pm-demo-item">
+                <span class="pm-demo-label">Gender</span>
+                <span class="pm-demo-val">${escapeHtml(r.gender || linked?.gender || "—")}</span>
+              </div>
+              <div class="pm-demo-item">
+                <span class="pm-demo-label">Age</span>
+                <span class="pm-demo-val">${(r.age != null ? r.age : linked?.age != null ? linked.age : null) != null ? `${escapeHtml(r.age != null ? r.age : linked.age)} yrs` : "—"}</span>
+              </div>
+              <div class="pm-demo-item">
+                <span class="pm-demo-label">City</span>
+                <span class="pm-demo-val">${escapeHtml(r.city || linked?.city || "—")}</span>
+              </div>
+            </div>
           </div>
             <section class="pm-score-ring-panel">
               <div class="pm-panel-header">
@@ -2462,6 +2520,12 @@
     if (!modal || !body || !id) return;
 
     openReportId = id;
+    const pdfBtn = $("#pm-view-pdf-btn");
+    if (pdfBtn) {
+      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+      pdfBtn.href = `/admin/api/reports/${encodeURIComponent(id)}/pdf${tokenParam}`;
+      pdfBtn.hidden = false;
+    }
     if (opts.fromBooking && opts.fromBooking.id) {
       openReportOrigin = { source: "appointments", bookingId: opts.fromBooking.id };
       syncPmTreatBtn(opts.fromBooking);
@@ -3569,6 +3633,105 @@
     }
   });
 
+  function initAdminCityAutocomplete() {
+    const input = $("#w-city");
+    const list = $("#w-city-dropdown-list");
+    const toggle = $("#w-city-toggle-btn");
+    const otherWrap = $("#w-other-city-wrap");
+    const otherInput = $("#w-other-city");
+    if (!input || !list) return;
+
+    let activeIndex = -1;
+
+    function renderList(cities) {
+      if (!cities.length) {
+        list.innerHTML = `<li class="autocomplete-empty">No cities found</li>`;
+      } else {
+        list.innerHTML = cities
+          .map(
+            (c, i) =>
+              `<li class="autocomplete-item${i === activeIndex ? " is-highlighted" : ""}" role="option" data-value="${escapeHtml(c)}">${escapeHtml(c)}</li>`
+          )
+          .join("");
+      }
+      list.hidden = false;
+    }
+
+    function checkOtherField() {
+      const val = input.value.trim();
+      if (val === "Other") {
+        if (otherWrap) otherWrap.hidden = false;
+      } else {
+        if (otherWrap) otherWrap.hidden = true;
+        if (otherInput) otherInput.value = "";
+      }
+    }
+
+    function filterCities() {
+      const query = input.value.trim().toLowerCase();
+      const matches = query
+        ? PAKISTANI_CITIES.filter((c) => c.toLowerCase().includes(query))
+        : PAKISTANI_CITIES;
+      renderList(matches);
+      checkOtherField();
+    }
+
+    input.addEventListener("focus", () => filterCities());
+    input.addEventListener("input", () => {
+      activeIndex = -1;
+      filterCities();
+    });
+
+    input.addEventListener("keydown", (e) => {
+      const items = list.querySelectorAll(".autocomplete-item");
+      if (!items.length || list.hidden) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+        filterCities();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        filterCities();
+      } else if (e.key === "Enter" && activeIndex >= 0) {
+        e.preventDefault();
+        const selected = items[activeIndex]?.dataset?.value;
+        if (selected) {
+          input.value = selected;
+          list.hidden = true;
+          checkOtherField();
+        }
+      } else if (e.key === "Escape") {
+        list.hidden = true;
+      }
+    });
+
+    list.addEventListener("click", (e) => {
+      const item = e.target.closest(".autocomplete-item");
+      if (!item) return;
+      input.value = item.dataset.value;
+      list.hidden = true;
+      checkOtherField();
+    });
+
+    if (toggle) {
+      toggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (list.hidden) filterCities();
+        else list.hidden = true;
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#w-city-autocomplete-wrap")) {
+        list.hidden = true;
+      }
+    });
+  }
+
+  // Initialize city autocomplete
+  initAdminCityAutocomplete();
+
   // Walk-in form submit
   $("#walkin-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -3579,6 +3742,11 @@
       status.className = "status is-error";
       return;
     }
+
+    const rawCity = $("#w-city")?.value.trim() || "";
+    const finalCity = rawCity === "Other" ? ($("#w-other-city")?.value.trim() || "Other") : rawCity;
+    const ageVal = $("#w-age")?.value.trim();
+
     status.textContent = "Saving…";
     status.className   = "status";
     try {
@@ -3588,6 +3756,9 @@
           name:   $("#w-name").value.trim(),
           email:  $("#w-email").value.trim(),
           phone:  $("#w-phone").value.trim(),
+          gender: $("#w-gender")?.value || null,
+          age:    ageVal ? Number(ageVal) : null,
+          city:   finalCity || null,
           date:   $("#w-date").value,
           time:   timeVal,
           note:   $("#w-note").value.trim() || null,

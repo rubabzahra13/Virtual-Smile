@@ -220,6 +220,11 @@ def build_report_pdf_bytes(
     category_scores: Any,
     findings: Any,
     images: Optional[list[tuple[str, bytes]]] = None,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    gender: Optional[str] = None,
+    age: Optional[int] = None,
+    city: Optional[str] = None,
 ) -> bytes:
     """Build a modern, aligned PDF with ReportLab (xhtml2pdf layout is unreliable)."""
     from reportlab.lib.colors import HexColor
@@ -454,6 +459,27 @@ def build_report_pdf_bytes(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
     ]))
     story.append(score_box)
+
+    demo_parts = [
+        f"<b>Name:</b> {_esc(name or '—')}",
+        f"<b>Email:</b> {_esc(email or '—')}",
+        f"<b>Gender:</b> {_esc(gender or '—')}",
+        f"<b>Age:</b> {_esc(f'{age} yrs' if age else '—')}",
+        f"<b>City:</b> {_esc(city or '—')}",
+    ]
+    demo_p = Paragraph(" &nbsp; | &nbsp; ".join(demo_parts), body_navy)
+    demo_table = Table([[demo_p]], colWidths=[content_width])
+    demo_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#eef7f7")),
+        ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#bce3e3")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(Spacer(1, 8))
+    story.append(demo_table)
+
     story.append(Spacer(1, 14))
 
     photo_items: list[tuple[str, bytes]] = []
@@ -918,6 +944,10 @@ def send_assessment_email(
     report_text: str,
     category_scores: Any = None,
     images: Optional[list[tuple[str, bytes]]] = None,
+    name: Optional[str] = None,
+    gender: Optional[str] = None,
+    age: Optional[int] = None,
+    city: Optional[str] = None,
 ) -> bool:
     # report_text kept for API compatibility / future use; PDF mirrors dashboard findings UI.
     _ = report_text
@@ -929,6 +959,11 @@ def send_assessment_email(
             category_scores=category_scores,
             findings=findings,
             images=images,
+            name=name,
+            email=to_email,
+            gender=gender,
+            age=age,
+            city=city,
         )
     except Exception:
         logger.exception("Assessment PDF generation failed")

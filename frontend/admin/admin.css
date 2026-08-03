@@ -1432,6 +1432,138 @@ select {
   color: var(--teal-dark);
 }
 
+.pm-patient-demographics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(32, 64, 136, 0.08);
+}
+
+.pm-demo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(32, 64, 136, 0.035);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(32, 64, 136, 0.06);
+}
+
+.pm-demo-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pm-demo-val {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-studio-left .field select,
+.admin-select {
+  width: 100%;
+  height: 2.85rem;
+  padding: 0 0.85rem;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(32, 64, 136, 0.15);
+  background: var(--white);
+  color: var(--navy);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.book-studio-left .field select:focus,
+.admin-select:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0, 152, 152, 0.15);
+}
+
+.city-autocomplete-field,
+#w-city-autocomplete-wrap {
+  position: relative;
+  z-index: 50;
+}
+
+.book-studio-left .autocomplete-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.book-studio-left .autocomplete-control input {
+  padding-right: 2.2rem;
+}
+
+.book-studio-left .autocomplete-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.book-studio-left .autocomplete-list,
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 9999 !important;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.4rem 0;
+  list-style: none;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(32, 64, 136, 0.22) !important;
+  border-radius: 12px;
+  box-shadow: 0 14px 35px rgba(18, 40, 90, 0.25), 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+.book-studio-left .autocomplete-item,
+.autocomplete-item {
+  padding: 0.6rem 0.95rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #183068 !important;
+  background: #ffffff !important;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.book-studio-left .autocomplete-item:hover,
+.book-studio-left .autocomplete-item.is-highlighted,
+.autocomplete-item:hover,
+.autocomplete-item.is-highlighted {
+  background: rgba(0, 152, 152, 0.14) !important;
+  color: #006666 !important;
+  font-weight: 700;
+}
+
+.book-studio-left .autocomplete-empty,
+.autocomplete-empty {
+  padding: 0.75rem 0.95rem;
+  font-size: 0.85rem;
+  color: #64748b !important;
+  background: #ffffff !important;
+  font-style: italic;
+}
+
 .clinic-patient-report::before {
   content: none;
 }
@@ -5623,6 +5755,35 @@ button.data-card { cursor: pointer; }
   gap: 0.4rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.pm-view-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 152, 152, 0.25);
+  transition: all var(--t-fast) ease;
+  white-space: nowrap;
+}
+
+.pm-view-pdf-btn:hover {
+  background: #008080;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 152, 152, 0.35);
+}
+
+.pm-view-pdf-btn svg {
+  flex-shrink: 0;
 }
 
 .pm-header-treat-btn,

@@ -8,7 +8,7 @@ import os
 import time
 from typing import Optional
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Query
 
 
 TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
@@ -68,10 +68,16 @@ def verify_token(token: str) -> bool:
     return hmac.compare_digest(sig, expected)
 
 
-def require_admin(authorization: Optional[str] = Header(None)) -> str:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing admin token.")
-    token = authorization.split(" ", 1)[1].strip()
-    if not verify_token(token):
-        raise HTTPException(status_code=401, detail="Invalid or expired admin token.")
+def require_admin(
+    authorization: Optional[str] = Header(None),
+    token_param: Optional[str] = Query(None, alias="token"),
+) -> str:
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif token_param:
+        token = token_param.strip()
+
+    if not token or not verify_token(token):
+        raise HTTPException(status_code=401, detail="Missing or invalid admin token.")
     return token
