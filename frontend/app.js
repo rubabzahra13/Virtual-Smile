@@ -1370,6 +1370,8 @@
           report_text: state.reportText,
           overall_score: state.overallScore,
           email: state.email,
+          phone: state.phone,
+          assessment_id: state.assessmentId,
           history: priorHistory,
         }),
       });

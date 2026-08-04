@@ -1689,11 +1689,57 @@
       pdfBtn.hidden = true;
       pdfBtn.href = "#";
     }
+    const chatBtn = $("#pm-view-chat-btn");
+    if (chatBtn) {
+      chatBtn.hidden = true;
+      chatBtn.onclick = null;
+    }
     const headerActions = $("#pm-header-appt-actions");
     if (headerActions) {
       headerActions.innerHTML = "";
       headerActions.hidden = true;
     }
+  }
+
+  function closeChatHistoryModal() {
+    const modal = $("#patient-chat-modal");
+    if (modal) modal.hidden = true;
+  }
+
+  function openChatHistoryModal(patientName, history) {
+    const modal = $("#patient-chat-modal");
+    const body = $("#pcm-body");
+    const title = $("#pcm-title");
+    if (!modal || !body) return;
+
+    if (title) {
+      title.textContent = patientName ? `Queries — ${patientName}` : "Patient Queries";
+    }
+
+    if (!Array.isArray(history) || history.length === 0) {
+      body.innerHTML = `<p class="pcm-empty">No chatbot history available for this patient.</p>`;
+    } else {
+      let html = `<div class="pcm-timeline">`;
+      history.forEach((msg) => {
+        const isUser = msg.role === "user";
+        const roleLabel = isUser ? "Patient" : "Chatbot";
+        const roleCls = isUser ? "pcm-user" : "pcm-bot";
+        const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+        html += `
+          <div class="pcm-msg ${roleCls}">
+            <div class="pcm-msg-header">
+              <span class="pcm-role-badge">${escapeHtml(roleLabel)}</span>
+              ${timeStr ? `<span class="pcm-time">${escapeHtml(timeStr)}</span>` : ""}
+            </div>
+            <div class="pcm-msg-content">${escapeHtml(msg.content).replace(/\n/g, "<br>")}</div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      body.innerHTML = html;
+    }
+
+    modal.hidden = false;
   }
 
   let openReportBooking = null;
@@ -2551,6 +2597,18 @@
 
     if (title) title.textContent = name;
     renderPhotoCarousel();
+
+    const chatHist = data.chat_history || r.chat_history || null;
+    const chatBtn = $("#pm-view-chat-btn");
+    if (chatBtn) {
+      if (Array.isArray(chatHist) && chatHist.length > 0) {
+        chatBtn.hidden = false;
+        chatBtn.onclick = () => openChatHistoryModal(name, chatHist);
+      } else {
+        chatBtn.hidden = true;
+        chatBtn.onclick = null;
+      }
+    }
     if (animateBars) {
       requestAnimationFrame(() => {
         body.querySelectorAll(".pm-score-bar-fill").forEach((el) => {
@@ -3584,6 +3642,10 @@
     el.addEventListener("click", closePatientModal)
   );
 
+  $$("[data-close-chat-modal]").forEach((el) =>
+    el.addEventListener("click", closeChatHistoryModal)
+  );
+
   // Cancel / rebook booking
   $("#bookings-list")?.addEventListener("click", (e) => {
     const reportBtn = e.target.closest("[data-view-report]");
@@ -3732,6 +3794,10 @@
     }
     if ($("#dash-filter-wrap")?.classList.contains("is-open")) {
       closeDashFilterMenu();
+      return;
+    }
+    if ($("#patient-chat-modal") && !$("#patient-chat-modal").hidden) {
+      closeChatHistoryModal();
       return;
     }
     if ($("#patient-modal") && !$("#patient-modal").hidden) {

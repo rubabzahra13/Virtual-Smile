@@ -33,6 +33,7 @@ from photo_storage import (
     signed_url_for_path,
     upload_assessment_photos,
 )
+from chat_storage import get_chat_history
 from slots import free_slots_for_date, generate_slots_for_date, month_availability, pick_schedule_for_date
 
 logger = logging.getLogger(__name__)
@@ -1051,6 +1052,11 @@ def admin_reports(
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
             "photo_front_url": signed_url_for_path(front_path) if front_path else None,
+            "chat_history": get_chat_history(
+                assessment_id=row.get("id"),
+                email=row.get("email"),
+                phone=row.get("phone"),
+            ),
         }
 
         if qn:
@@ -1194,7 +1200,36 @@ def admin_report_detail(report_id: str, _: str = Depends(require_admin)):
         photos = signed_photo_urls(report)
     except Exception:
         logger.exception("Could not build signed photo URLs")
-    return {"report": report, "bookings": bookings, "photos": photos}
+
+    chat_hist = get_chat_history(
+        assessment_id=report.get("id"),
+        email=report.get("email"),
+        phone=report.get("phone"),
+    )
+    report["chat_history"] = chat_hist
+    return {"report": report, "bookings": bookings, "photos": photos, "chat_history": chat_hist}
+
+
+@admin_router.get("/reports/{report_id}/chat-history")
+def admin_report_chat_history(report_id: str, _: str = Depends(require_admin)):
+    _require_db()
+
+    def _load_report():
+        sb = get_supabase()
+        return sb.table("assessments").select("id,email,phone").eq("id", report_id).limit(1).execute()
+
+    try:
+        res = db_retry(_load_report, label="admin report chat history")
+        data = res.data[0] if res.data else {}
+        history = get_chat_history(
+            assessment_id=report_id,
+            email=data.get("email"),
+            phone=data.get("phone"),
+        )
+        return {"report_id": report_id, "history": history}
+    except Exception:
+        history = get_chat_history(assessment_id=report_id)
+        return {"report_id": report_id, "history": history}
 
 
 @admin_router.get("/reports/{report_id}/pdf")

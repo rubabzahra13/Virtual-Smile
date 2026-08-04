@@ -590,6 +590,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             <span>View PDF</span>
           </a>
+          <button id="pm-view-chat-btn" class="pm-view-chat-btn" type="button" hidden title="View patient chatbot queries">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>View Patient Queries</span>
+          </button>
           <div id="pm-header-appt-actions" class="pm-header-appt-actions" hidden></div>
           <button type="button" class="pm-close-btn" data-close-patient-modal aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -598,6 +602,31 @@
       </div>
       <div class="pm-body" id="pm-body">
         <!-- populated by admin.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       PATIENT CHATBOT HISTORY MODAL
+  ════════════════════════════════════════════════════ -->
+  <div id="patient-chat-modal" class="patient-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pcm-title">
+    <div class="patient-modal-backdrop" data-close-chat-modal></div>
+    <div class="patient-modal-box pcm-modal-box">
+      <div class="pm-header">
+        <div class="pm-header-left">
+          <div>
+            <div class="pm-header-eyebrow">Chatbot Activity</div>
+            <h3 class="pm-header-title" id="pcm-title">Patient Queries</h3>
+          </div>
+        </div>
+        <div class="pm-header-actions">
+          <button type="button" class="pm-close-btn" data-close-chat-modal aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="pcm-body" id="pcm-body">
+        <!-- Rendered chatbot conversation -->
       </div>
     </div>
   </div>

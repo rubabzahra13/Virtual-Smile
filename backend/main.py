@@ -35,6 +35,7 @@ from language_utils import contains_forbidden_script, detect_chat_language
 from patient_features import build_chat_prompt, create_smile_simulation
 from providers import call_gemini_text, call_groq_text, call_provider_text
 from report import build_groq_comparison_report, build_report
+from chat_storage import save_chat_turn, get_chat_history
 
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_ENV_PATH)
@@ -46,6 +47,7 @@ app = FastAPI(title="The Global Dentist - Virtual Smile Assessment")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -151,6 +153,8 @@ class ChatRequest(BaseModel):
     report_text: str = Field(..., min_length=10)
     overall_score: Optional[int] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
+    assessment_id: Optional[str] = None
     history: List[ChatMessage] = Field(default_factory=list)
 
 
@@ -545,6 +549,17 @@ async def chat(payload: ChatRequest):
 
     if not answer:
         raise HTTPException(status_code=502, detail="Chat model returned an empty answer.")
+
+    try:
+        save_chat_turn(
+            assessment_id=payload.assessment_id,
+            email=payload.email,
+            phone=payload.phone,
+            question=payload.question,
+            answer=answer,
+        )
+    except Exception as e:
+        print("save_chat_turn exception:", type(e), e)
 
     return {
         "answer": answer,

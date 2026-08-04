@@ -1,0 +1,194 @@
+{
+  "email:chatbotpatient@example.com": [
+    {
+      "role": "user",
+      "content": "I have pain in my lower jaw. What should I do?",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on your symptoms, we recommend consulting a dentist.",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    }
+  ],
+  "id:test-assess-123": [
+    {
+      "role": "user",
+      "content": "I have pain in my lower jaw. What should I do?",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on your symptoms, we recommend consulting a dentist.",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    }
+  ],
+  "phone:+923009998877": [
+    {
+      "role": "user",
+      "content": "I have pain in my lower jaw. What should I do?",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on your symptoms, we recommend consulting a dentist.",
+      "timestamp": "2026-08-04T09:41:45.797010+00:00"
+    }
+  ],
+  "id:f652ef71-78c3-4f71-a3eb-a2a0cb6be77c": [
+    {
+      "role": "user",
+      "content": "KYA MERE DAANT THEEK HO JAAYEN GAY?",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "The Global Dentist mein aap ka khair-maqdam hai! Aap ke assessment report ke mutabiq, aap ke daanton mein extensive decay, gingival inflammation aur severe tooth wear hai, jin ka ilaaj mumkin hai. Doctor fillings, crowns ya extractions ke zariye in masail ko hal kar sakte hain, aur missing teeth ke liye bridges ya implants bhi lagaye ja sakte hain. Yeh aik preliminary AI assessment hai aur final diagnosis nahi hai, is liye behtar hoga ke aap jald hi kisi dentist se check-up karwayen.",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "user",
+      "content": "WHAT ISSUE IN MY TOOTH?",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! Based on your assessment report, you are dealing with extensive tooth decay, severe tooth wear, and gum inflammation with recession. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional dental exam is needed to confirm everything. We recommend booking an appointment soon so our dental team can evaluate these concerns and help restore your smile!",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOW TO FIX ?",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! To fix these issues, our suggested treatment roadmap starts with a prompt evaluation by a dentist to address active infection and decay. Next, you may need deep gum cleanings, fillings, crowns, or extractions for heavily worn teeth. Finally, missing upper teeth can be replaced using options like dental implants, bridges, or partial dentures. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional clinical exam is required to confirm your treatment plan!",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "user",
+      "content": "ANY HOME SOLUTION?",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Welcome back to The Global Dentist! While home care like gentle brushing and warm saltwater rinses can help keep your mouth clean, there are no home remedies that can fix extensive decay, severe tooth wear, or gum recession. These advanced issues require professional dental interventions such as fillings, crowns, deep cleanings, or extractions. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOMEOPATHY SOLUTION?",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! While some people use homeopathy for temporary symptom relief, there are no homeopathic remedies that can cure extensive decay, severe tooth wear, or gum recession. These advanced dental issues require professional interventions like deep cleanings, fillings, crowns, or extractions by a dentist. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    }
+  ],
+  "phone:+923025999529": [
+    {
+      "role": "user",
+      "content": "KYA MERE DAANT THEEK HO JAAYEN GAY?",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "The Global Dentist mein aap ka khair-maqdam hai! Aap ke assessment report ke mutabiq, aap ke daanton mein extensive decay, gingival inflammation aur severe tooth wear hai, jin ka ilaaj mumkin hai. Doctor fillings, crowns ya extractions ke zariye in masail ko hal kar sakte hain, aur missing teeth ke liye bridges ya implants bhi lagaye ja sakte hain. Yeh aik preliminary AI assessment hai aur final diagnosis nahi hai, is liye behtar hoga ke aap jald hi kisi dentist se check-up karwayen.",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "user",
+      "content": "WHAT ISSUE IN MY TOOTH?",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! Based on your assessment report, you are dealing with extensive tooth decay, severe tooth wear, and gum inflammation with recession. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional dental exam is needed to confirm everything. We recommend booking an appointment soon so our dental team can evaluate these concerns and help restore your smile!",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOW TO FIX ?",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! To fix these issues, our suggested treatment roadmap starts with a prompt evaluation by a dentist to address active infection and decay. Next, you may need deep gum cleanings, fillings, crowns, or extractions for heavily worn teeth. Finally, missing upper teeth can be replaced using options like dental implants, bridges, or partial dentures. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional clinical exam is required to confirm your treatment plan!",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "user",
+      "content": "ANY HOME SOLUTION?",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Welcome back to The Global Dentist! While home care like gentle brushing and warm saltwater rinses can help keep your mouth clean, there are no home remedies that can fix extensive decay, severe tooth wear, or gum recession. These advanced issues require professional dental interventions such as fillings, crowns, deep cleanings, or extractions. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOMEOPATHY SOLUTION?",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! While some people use homeopathy for temporary symptom relief, there are no homeopathic remedies that can cure extensive decay, severe tooth wear, or gum recession. These advanced dental issues require professional interventions like deep cleanings, fillings, crowns, or extractions by a dentist. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    }
+  ],
+  "email:nabeeha529@gmail.com": [
+    {
+      "role": "user",
+      "content": "KYA MERE DAANT THEEK HO JAAYEN GAY?",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "The Global Dentist mein aap ka khair-maqdam hai! Aap ke assessment report ke mutabiq, aap ke daanton mein extensive decay, gingival inflammation aur severe tooth wear hai, jin ka ilaaj mumkin hai. Doctor fillings, crowns ya extractions ke zariye in masail ko hal kar sakte hain, aur missing teeth ke liye bridges ya implants bhi lagaye ja sakte hain. Yeh aik preliminary AI assessment hai aur final diagnosis nahi hai, is liye behtar hoga ke aap jald hi kisi dentist se check-up karwayen.",
+      "timestamp": "2026-08-04T09:46:12.991123+00:00"
+    },
+    {
+      "role": "user",
+      "content": "WHAT ISSUE IN MY TOOTH?",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! Based on your assessment report, you are dealing with extensive tooth decay, severe tooth wear, and gum inflammation with recession. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional dental exam is needed to confirm everything. We recommend booking an appointment soon so our dental team can evaluate these concerns and help restore your smile!",
+      "timestamp": "2026-08-04T09:46:26.391658+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOW TO FIX ?",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! To fix these issues, our suggested treatment roadmap starts with a prompt evaluation by a dentist to address active infection and decay. Next, you may need deep gum cleanings, fillings, crowns, or extractions for heavily worn teeth. Finally, missing upper teeth can be replaced using options like dental implants, bridges, or partial dentures. Please remember that this is a preliminary AI assessment and not a diagnosis, so a professional clinical exam is required to confirm your treatment plan!",
+      "timestamp": "2026-08-04T09:46:34.914999+00:00"
+    },
+    {
+      "role": "user",
+      "content": "ANY HOME SOLUTION?",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Welcome back to The Global Dentist! While home care like gentle brushing and warm saltwater rinses can help keep your mouth clean, there are no home remedies that can fix extensive decay, severe tooth wear, or gum recession. These advanced issues require professional dental interventions such as fillings, crowns, deep cleanings, or extractions. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:43.326464+00:00"
+    },
+    {
+      "role": "user",
+      "content": "HOMEOPATHY SOLUTION?",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello again from The Global Dentist! While some people use homeopathy for temporary symptom relief, there are no homeopathic remedies that can cure extensive decay, severe tooth wear, or gum recession. These advanced dental issues require professional interventions like deep cleanings, fillings, crowns, or extractions by a dentist. Please remember that this is a preliminary AI assessment and not a diagnosis, so you should visit our clinic soon for a proper clinical evaluation and safe treatment.",
+      "timestamp": "2026-08-04T09:46:57.110182+00:00"
+    }
+  ]
+}
