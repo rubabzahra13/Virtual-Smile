@@ -840,13 +840,34 @@
   function bookingRowHtml(b, index) {
     const initials = initialsFrom(b.email, b.name);
     const isTreated = bookingIsTreated(b);
-    const isConfirmedActive = b.status === "confirmed" && !isTreated;
+    const isPending = b.status === "pending";
+    const isConfirmedActive = (b.status === "confirmed" || b.status === "approved") && !isTreated;
     const canCancel = isConfirmedActive;
-    const canToggleTreated = b.status === "confirmed" || isTreated;
-    const canRebook = b.status === "cancelled" || isTreated;
+    const canToggleTreated = (b.status === "confirmed" || b.status === "approved") || isTreated;
+    const canRebook = b.status === "cancelled" || b.status === "rejected" || isTreated;
     const whenLabel = formatBookingWhen(b.date, b.time);
     const reportId = String(b.assessment_id || "").trim();
     const actions = [];
+    if (isPending) {
+      actions.push(`
+        <button type="button" class="booking-approve-btn"
+          data-approve="${escapeHtml(b.id)}"
+          data-approve-name="${escapeHtml(b.name || "")}"
+          data-approve-email="${escapeHtml(b.email || "")}"
+          data-approve-when="${escapeHtml(whenLabel)}"
+          aria-label="Approve appointment">
+          Approve
+        </button>`);
+      actions.push(`
+        <button type="button" class="booking-reject-btn"
+          data-reject="${escapeHtml(b.id)}"
+          data-reject-name="${escapeHtml(b.name || "")}"
+          data-reject-email="${escapeHtml(b.email || "")}"
+          data-reject-when="${escapeHtml(whenLabel)}"
+          aria-label="Reject appointment">
+          Reject
+        </button>`);
+    }
     if (canToggleTreated) {
       actions.push(`
         <button type="button" class="booking-treat-btn${isTreated ? " is-treated" : ""}"
@@ -884,7 +905,7 @@
           aria-label="Cancel appointment">
           Cancel
         </button>`);
-    } else if (canRebook) {
+    } else if (canRebook && !isPending) {
       actions.push(`
         <button type="button" class="booking-rebook-btn"
           data-book-again
@@ -983,9 +1004,11 @@
 
   /* Status badge for appointments */
   function statusBadge(status, treated = false) {
+    if (status === "pending") return `<span class="ig-pill is-warning">Pending Approval</span>`;
+    if (status === "rejected") return `<span class="ig-pill is-danger">Rejected</span>`;
     if (status === "cancelled") return `<span class="ig-pill is-danger">Cancelled</span>`;
     if (treated || status === "treated") return `<span class="ig-pill is-teal">Treated</span>`;
-    if (status === "confirmed") return `<span class="ig-pill is-ok">Confirmed</span>`;
+    if (status === "confirmed" || status === "approved") return `<span class="ig-pill is-ok">Approved</span>`;
     return `<span class="ig-pill is-muted">${escapeHtml(status)}</span>`;
   }
 
@@ -1983,6 +2006,31 @@
       status.className = "confirm-status";
     }
     try {
+      if (kind === "approve") {
+        const data = await api(`/admin/api/bookings/${pendingConfirm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "approved" }),
+        });
+        closeConfirmModal();
+        if (ghost) ghost.disabled = false;
+        loadBookings();
+        loadStats();
+        if (data?.email_sent === false) {
+          alert("Appointment approved, but the confirmation email could not be sent.");
+        }
+        return;
+      }
+      if (kind === "reject") {
+        await api(`/admin/api/bookings/${pendingConfirm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "rejected" }),
+        });
+        closeConfirmModal();
+        if (ghost) ghost.disabled = false;
+        loadBookings();
+        loadStats();
+        return;
+      }
       if (kind === "cancel") {
         const data = await api(`/admin/api/bookings/${pendingConfirm.id}`, {
           method: "PATCH",
@@ -2745,6 +2793,8 @@
   let walkinViewYear = null;
   let walkinViewMonth = null; // 0-11
   let walkinAllSlots = [];
+  let walkinFreeSlots = [];
+  let walkinBookedSlots = [];
   let walkinMonthMeta = {};
   let walkinMonthMetaKey = "";
 
@@ -2992,14 +3042,16 @@
     text.textContent = `${dateLabel}, ${range}`;
   }
 
-  function syncWalkinTimeUi({ disabled = false, label = "Select a date first", slots = [], selected = "" } = {}) {
+  function syncWalkinTimeUi({ disabled = false, label = "Select a date first", allSlots = [], freeSlots = [], bookedSlots = [], selected = "" } = {}) {
     const time = $("#w-time");
     const grid = $("#w-slot-grid");
     if (!time || !grid) return;
 
-    walkinAllSlots = Array.isArray(slots) ? slots.slice() : [];
+    walkinAllSlots = Array.isArray(allSlots) ? allSlots.slice() : [];
+    walkinFreeSlots = Array.isArray(freeSlots) ? freeSlots.slice() : [];
+    walkinBookedSlots = Array.isArray(bookedSlots) ? bookedSlots.slice() : [];
 
-    if (disabled || !walkinAllSlots.length) {
+    if (disabled || (!walkinAllSlots.length && !walkinFreeSlots.length)) {
       time.value = "";
       time.disabled = true;
       grid.innerHTML = `<div class="book-slot-empty">${escapeHtml(label)}</div>`;
@@ -3007,8 +3059,8 @@
       return;
     }
 
-    const chosen = walkinAllSlots.includes(selected) ? selected : walkinAllSlots[0];
-    time.disabled = false;
+    const chosen = walkinFreeSlots.includes(selected) ? selected : (walkinFreeSlots[0] || "");
+    time.disabled = !chosen;
     time.value = chosen;
     renderWalkinSlotGrid();
     updateWalkinSelectedSummary();
@@ -3020,14 +3072,24 @@
     if (!grid || !time) return;
     const chosen = time.value;
 
-    grid.innerHTML = walkinAllSlots
-      .map(
-        (slot) => `
-      <button type="button" class="book-slot${slot === chosen ? " is-active" : ""}"
-        role="option" data-slot="${escapeHtml(slot)}" aria-selected="${slot === chosen}">
-        ${escapeHtml(formatTime12(slot))}
-      </button>`
-      )
+    const slotsToRender = walkinAllSlots.length
+      ? walkinAllSlots
+      : [...new Set([...walkinFreeSlots, ...walkinBookedSlots])].sort();
+
+    grid.innerHTML = slotsToRender
+      .map((slot) => {
+        const isFree = walkinFreeSlots.includes(slot);
+        const isBooked = walkinBookedSlots.includes(slot) || !isFree;
+        const isActive = slot === chosen && isFree;
+        const label = formatTime12(slot);
+        const displayLabel = isBooked ? `${label} (Taken)` : label;
+        return `
+          <button type="button" class="book-slot${isActive ? " is-active" : ""}${isBooked ? " is-taken is-disabled" : ""}"
+            role="option" data-slot="${escapeHtml(slot)}" ${isBooked ? "disabled" : ""} aria-selected="${isActive}"
+            title="${isBooked ? "This slot is already booked" : "Available slot"}">
+            ${escapeHtml(displayLabel)}
+          </button>`;
+      })
       .join("");
   }
 
@@ -3049,14 +3111,17 @@
         syncWalkinTimeUi({ disabled: true, label: "No open times" });
         return;
       }
-      let slots = Array.isArray(data.slots) ? data.slots : [];
+      let freeSlots = Array.isArray(data.slots) ? data.slots : [];
+      let bookedSlots = Array.isArray(data.booked) ? data.booked : [];
+      let allSlots = Array.isArray(data.all_slots) ? data.all_slots : [];
       const todayIso = isoDateLocal(startOfLocalDay());
       if (day === todayIso) {
         const now = new Date();
         const currentHhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-        slots = slots.filter((s) => s > currentHhmm);
+        freeSlots = freeSlots.filter((s) => s > currentHhmm);
+        allSlots = allSlots.filter((s) => s > currentHhmm);
       }
-      if (!slots.length) {
+      if (!freeSlots.length && !allSlots.length) {
         hint.textContent = data.closed
           ? "Clinic closed on this date."
           : "No free slots on this date.";
@@ -3067,13 +3132,15 @@
       syncWalkinTimeUi({
         disabled: false,
         label: "Select a time",
-        slots,
+        allSlots,
+        freeSlots,
+        bookedSlots,
         selected: previous,
       });
       if (data.open_time && data.close_time) {
-        hint.textContent = `Clinic hours: ${formatTime12(data.open_time)} – ${formatTime12(data.close_time)}`;
+        hint.textContent = `Clinic hours: ${formatTime12(data.open_time)} – ${formatTime12(data.close_time)} (${freeSlots.length} available, ${bookedSlots.length} taken)`;
       } else {
-        hint.textContent = `${slots.length} slots available`;
+        hint.textContent = `${freeSlots.length} slots available (${bookedSlots.length} taken)`;
       }
     } catch {
       hint.textContent = "Could not load slots.";
@@ -3542,6 +3609,42 @@
         email: treatBtn.dataset.treatEmail || "",
         when: treatBtn.dataset.treatWhen || "",
         currentlyTreated: treatBtn.dataset.treated === "1",
+      });
+      return;
+    }
+    const approveBtn = e.target.closest("[data-approve]");
+    if (approveBtn) {
+      pendingConfirm = {
+        kind: "approve",
+        id: approveBtn.dataset.approve,
+        name: approveBtn.dataset.approveName || "",
+        email: approveBtn.dataset.approveEmail || "",
+        when: approveBtn.dataset.approveWhen || "",
+      };
+      showConfirmModal({
+        title: "Approve appointment?",
+        copy: "This will approve the appointment and send the confirmation email to the patient.",
+        okLabel: "Approve & Send Email",
+        ghostLabel: "Keep pending",
+        okClass: "confirm-btn-teal",
+      });
+      return;
+    }
+    const rejectBtn = e.target.closest("[data-reject]");
+    if (rejectBtn) {
+      pendingConfirm = {
+        kind: "reject",
+        id: rejectBtn.dataset.reject,
+        name: rejectBtn.dataset.rejectName || "",
+        email: rejectBtn.dataset.rejectEmail || "",
+        when: rejectBtn.dataset.rejectWhen || "",
+      };
+      showConfirmModal({
+        title: "Reject appointment?",
+        copy: "This will reject the appointment request. No confirmation email will be sent.",
+        okLabel: "Reject appointment",
+        ghostLabel: "Keep pending",
+        okClass: "confirm-btn-danger",
       });
       return;
     }

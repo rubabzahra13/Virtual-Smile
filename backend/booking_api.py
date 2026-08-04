@@ -88,6 +88,34 @@ def _assessment_lookup_maps(assessments: list[dict]) -> tuple[dict[str, str], di
     )
 
 
+def get_booking_status(b: dict) -> str:
+    if not b:
+        return "cancelled"
+    raw_status = str(b.get("status") or "").lower()
+    note = str(b.get("note") or "").strip()
+    if note.startswith("[PENDING]"):
+        return "pending"
+    if note.startswith("[REJECTED]") or raw_status == "rejected":
+        return "rejected"
+    if raw_status == "cancelled":
+        return "cancelled"
+    if raw_status == "pending":
+        return "pending"
+    if raw_status in {"confirmed", "approved"}:
+        return "approved"
+    return raw_status or "pending"
+
+
+def clean_booking_note(note: Optional[str]) -> Optional[str]:
+    if not note:
+        return None
+    s = str(note).strip()
+    for prefix in ("[PENDING]", "[REJECTED]", "[APPROVED]", "[TREATED]"):
+        if s.startswith(prefix):
+            s = s[len(prefix):].strip()
+    return s or None
+
+
 def resolve_booking_assessment_id(
     booking: dict,
     *,
@@ -131,7 +159,7 @@ class BookingCreate(BaseModel):
 
 
 class BookingPatch(BaseModel):
-    status: Optional[Literal["confirmed", "cancelled"]] = None
+    status: Optional[Literal["pending", "approved", "confirmed", "rejected", "cancelled"]] = None
     treated: Optional[bool] = None
     date: Optional[str] = None
     time: Optional[str] = None
@@ -217,12 +245,18 @@ def fetch_bookings_for_date(day: str) -> list[dict]:
     sb = get_supabase()
     res = (
         sb.table("bookings")
-        .select("id,date,time,status")
+        .select("id,date,time,status,note")
         .eq("date", day)
-        .eq("status", "confirmed")
+        .in_("status", ["pending", "confirmed", "approved"])
         .execute()
     )
-    return list(res.data or [])
+    active = []
+    for r in list(res.data or []):
+        st = get_booking_status(r)
+        if st in {"pending", "confirmed", "approved"}:
+            r["status"] = st
+            active.append(r)
+    return active
 
 
 def fetch_bookings_for_month(year: int, month: int) -> list[dict]:
@@ -234,13 +268,19 @@ def fetch_bookings_for_month(year: int, month: int) -> list[dict]:
     sb = get_supabase()
     res = (
         sb.table("bookings")
-        .select("id,date,time,status")
+        .select("id,date,time,status,note")
         .gte("date", start.isoformat())
         .lt("date", end.isoformat())
-        .eq("status", "confirmed")
+        .in_("status", ["pending", "confirmed", "approved"])
         .execute()
     )
-    return list(res.data or [])
+    active = []
+    for r in list(res.data or []):
+        st = get_booking_status(r)
+        if st in {"pending", "confirmed", "approved"}:
+            r["status"] = st
+            active.append(r)
+    return active
 
 
 def check_eligibility(email: str, phone: str) -> dict:
@@ -388,7 +428,7 @@ def persist_assessment(
 
 
 def find_confirmed_booking(*, email: str = "", phone: str = "") -> Optional[dict]:
-    """Return an existing confirmed booking for this email or phone, if any."""
+    """Return an existing active (pending/confirmed/approved) booking for this email or phone, if any."""
     email_n = normalize_email(email)
     phone_n = normalize_phone(phone)
     if not email_n and not phone_n:
@@ -398,16 +438,20 @@ def find_confirmed_booking(*, email: str = "", phone: str = "") -> Optional[dict
     def _lookup(field: str, value: str) -> Optional[dict]:
         res = db_retry(
             lambda: sb.table("bookings")
-            .select("id,name,email,phone,date,time,status,source,created_at")
+            .select("id,name,email,phone,date,time,status,note,source,created_at")
             .eq(field, value)
-            .eq("status", "confirmed")
+            .in_("status", ["pending", "confirmed", "approved"])
             .order("date")
-            .limit(1)
             .execute(),
             label=f"booking lookup by {field}",
         )
         rows = list(res.data or [])
-        return rows[0] if rows else None
+        for r in rows:
+            st = get_booking_status(r)
+            if st in {"pending", "confirmed", "approved"}:
+                r["status"] = st
+                return r
+        return None
 
     if email_n:
         found = _lookup("email", email_n)
@@ -463,6 +507,10 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
             headers={"X-Booked-Slots": ",".join(booked)},
         )
 
+    raw_note = (body.note or "").strip()
+    is_admin = source == "admin"
+    note_val = (raw_note or None) if is_admin else (f"[PENDING] {raw_note}".strip() if raw_note else "[PENDING]")
+
     row = {
         "assessment_id": body.assessment_id or None,
         "name": name,
@@ -473,7 +521,7 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
         "city": city,
         "date": day,
         "time": slot,
-        "note": (body.note or "").strip() or None,
+        "note": note_val,
         "source": source,
         "status": "confirmed",
     }
@@ -495,7 +543,7 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
                 "phone": phone_n,
                 "date": day,
                 "time": slot,
-                "note": (body.note or "").strip() or None,
+                "note": note_val,
                 "source": source,
                 "status": "confirmed",
             }
@@ -506,20 +554,27 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
     if not data:
         raise HTTPException(status_code=500, detail="Booking could not be created.")
 
-    try:
-        sent = send_booking_email(
-            to_email=email_n,
-            name=name,
-            phone=phone_n,
-            day=day,
-            time_slot=slot,
-            note=(body.note or "").strip(),
-        )
-        data["email_sent"] = bool(sent)
-    except Exception:
-        logger.exception("Booking confirmation email failed")
+    if is_admin:
+        data["status"] = "approved"
+        data["note"] = raw_note or None
+        try:
+            sent = send_booking_email(
+                to_email=email_n,
+                name=name,
+                phone=phone_n,
+                day=day,
+                time_slot=slot,
+                note=raw_note,
+            )
+            data["email_sent"] = bool(sent)
+        except Exception:
+            logger.exception("Booking confirmation email failed for admin-created booking")
+            data["email_sent"] = False
+    else:
+        # Return pending status to application / client UI
+        data["status"] = "pending"
+        data["note"] = raw_note or None
         data["email_sent"] = False
-
     return data
 
 
@@ -587,6 +642,7 @@ def api_availability(day: str = Query(..., alias="date")):
         "date": day_s,
         "slots": free,
         "booked": booked,
+        "all_slots": all_slots,
         "closed": len(all_slots) == 0,
         "open_time": open_time,
         "close_time": close_time,
@@ -657,12 +713,18 @@ def admin_stats(_: str = Depends(require_admin)):
                 b["count"] += 1
                 break
 
+    for r in bookings:
+        r["status"] = get_booking_status(r)
+        r["treated"] = booking_is_treated(r)
+        r["note"] = clean_booking_note(r.get("note"))
+
+    pending_count = sum(1 for b in bookings if b.get("status") == "pending")
     confirmed = [
         b
         for b in bookings
-        if b.get("status") == "confirmed" and not booking_is_treated(b)
+        if b.get("status") in {"confirmed", "approved"} and not b.get("treated")
     ]
-    cancelled = sum(1 for b in bookings if b.get("status") == "cancelled")
+    cancelled = sum(1 for b in bookings if b.get("status") in {"cancelled", "rejected"})
     today = date_cls.today().isoformat()
     today_dt = date_cls.today()
 
@@ -687,7 +749,7 @@ def admin_stats(_: str = Depends(require_admin)):
         except ValueError:
             return None
 
-    all_confirmed = [b for b in bookings if b.get("status") == "confirmed"]
+    all_confirmed = [b for b in bookings if b.get("status") in {"confirmed", "approved"}]
     bookings_week = sum(
         1
         for b in all_confirmed
@@ -765,6 +827,7 @@ def admin_stats(_: str = Depends(require_admin)):
 
     return {
         "assessment_count": len(assessments),
+        "pending_count": pending_count,
         "booking_count": len(confirmed),
         "cancelled_count": cancelled,
         "today_count": len(today_visits),
@@ -1095,7 +1158,7 @@ def admin_bookings(
     q: str = Query(""),
     sort: str = Query("date"),
     order: str = Query("desc"),
-    status: str = Query("confirmed"),
+    status: str = Query("pending"),
     limit: int = Query(200, ge=1, le=500),
 ):
     _require_db()
@@ -1105,10 +1168,6 @@ def admin_bookings(
     def _fetch():
         sb = get_supabase()
         query = sb.table("bookings").select("*")
-        if status == "cancelled":
-            query = query.eq("status", "cancelled")
-        elif status in {"confirmed", "treated"}:
-            query = query.eq("status", "confirmed")
         query = query.order(sort_col, desc=not ascending).limit(limit)
         return query.execute()
 
@@ -1121,12 +1180,19 @@ def admin_bookings(
             detail="Could not load appointments. Please try again.",
         )
 
-    if status == "confirmed":
-        rows = [r for r in rows if not booking_is_treated(r)]
-    elif status == "treated":
-        rows = [r for r in rows if booking_is_treated(r)]
     for r in rows:
+        r["status"] = get_booking_status(r)
         r["treated"] = booking_is_treated(r)
+        r["note"] = clean_booking_note(r.get("note"))
+
+    if status == "pending":
+        rows = [r for r in rows if r["status"] == "pending"]
+    elif status in {"confirmed", "approved"}:
+        rows = [r for r in rows if r["status"] in {"confirmed", "approved"} and not r["treated"]]
+    elif status in {"cancelled", "rejected"}:
+        rows = [r for r in rows if r["status"] in {"cancelled", "rejected"}]
+    elif status == "treated":
+        rows = [r for r in rows if r["treated"]]
 
     qn = q.strip().lower()
     if qn:
@@ -1169,11 +1235,41 @@ def admin_patch_booking(
     _: str = Depends(require_admin),
 ):
     _require_db()
+    sb = get_supabase()
+    current = (
+        sb.table("bookings").select("*").eq("id", booking_id).limit(1).execute()
+    ).data
+    if not current:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    cur = current[0]
+    cur_status = get_booking_status(cur)
+
     updates: dict[str, Any] = {}
+    clean_n = clean_booking_note(body.note if body.note is not None else cur.get("note"))
+
     if body.status is not None:
-        updates["status"] = body.status
-    if body.note is not None:
-        updates["note"] = body.note
+        st = body.status
+        if st in {"approved", "confirmed"}:
+            updates["status"] = "confirmed"
+            updates["note"] = clean_n
+        elif st == "rejected":
+            updates["status"] = "cancelled"
+            updates["note"] = f"[REJECTED] {clean_n}".strip() if clean_n else "[REJECTED]"
+        elif st == "cancelled":
+            updates["status"] = "cancelled"
+            updates["note"] = clean_n
+        elif st == "pending":
+            updates["status"] = "confirmed"
+            updates["note"] = f"[PENDING] {clean_n}".strip() if clean_n else "[PENDING]"
+
+    if body.note is not None and "note" not in updates:
+        if cur_status == "pending":
+            updates["note"] = f"[PENDING] {clean_n}".strip() if clean_n else "[PENDING]"
+        elif cur_status == "rejected":
+            updates["note"] = f"[REJECTED] {clean_n}".strip() if clean_n else "[REJECTED]"
+        else:
+            updates["note"] = clean_n
+
     if body.name is not None or body.fullName is not None:
         updates["name"] = (body.fullName or body.name or "").strip()
     if body.email is not None:
@@ -1191,22 +1287,12 @@ def admin_patch_booking(
     if body.time is not None:
         updates["time"] = parse_time_input(body.time)
 
-    sb = get_supabase()
-    current = (
-        sb.table("bookings").select("*").eq("id", booking_id).limit(1).execute()
-    ).data
-    if not current:
-        raise HTTPException(status_code=404, detail="Booking not found.")
-    cur = current[0]
-
     if body.treated is not None:
         updates["treated"] = bool(body.treated)
-        # Keep note marker in sync so Treated history works before/without the column.
-        if body.note is None:
+        if body.note is None and "note" not in updates:
             updates["note"] = treated_note_value(cur.get("note"), bool(body.treated))
 
     if body.date is not None or body.time is not None:
-        # Validate new slot availability (ignore this booking itself).
         day = updates.get("date") or cur["date"]
         slot = updates.get("time") or (str(cur["time"])[:5])
         schedules = fetch_schedules()
@@ -1216,7 +1302,8 @@ def admin_patch_booking(
             if b.get("id") != booking_id
         ]
         free, _ = free_slots_for_date(schedules, date_cls.fromisoformat(day), existing)
-        if slot not in free and updates.get("status", cur.get("status")) == "confirmed":
+        target_st = body.status or cur_status
+        if slot not in free and target_st in {"pending", "confirmed", "approved"}:
             raise HTTPException(status_code=409, detail="That slot is unavailable.")
 
     if not updates:
@@ -1251,8 +1338,27 @@ def admin_patch_booking(
     data = res.data[0]
     data["treated"] = booking_is_treated(data)
 
+    becoming_approved = (
+        body.status in {"approved", "confirmed"}
+        and cur_status not in {"approved", "confirmed"}
+    )
+    if becoming_approved:
+        try:
+            sent = send_booking_email(
+                to_email=str(data.get("email") or cur.get("email") or ""),
+                name=str(data.get("name") or cur.get("name") or ""),
+                phone=str(data.get("phone") or cur.get("phone") or ""),
+                day=str(data.get("date") or cur.get("date") or ""),
+                time_slot=str(data.get("time") or cur.get("time") or "")[:5],
+                note=str(clean_booking_note(data.get("note")) or ""),
+            )
+            data["email_sent"] = bool(sent)
+        except Exception:
+            logger.exception("Booking confirmation email failed for booking %s", booking_id)
+            data["email_sent"] = False
+
     becoming_cancelled = (
-        body.status == "cancelled" and str(cur.get("status") or "") != "cancelled"
+        body.status == "cancelled" and cur_status != "cancelled"
     )
     if becoming_cancelled:
         try:
@@ -1268,6 +1374,8 @@ def admin_patch_booking(
             logger.exception("Cancellation email failed for booking %s", booking_id)
             data["email_sent"] = False
 
+    data["status"] = get_booking_status(data)
+    data["note"] = clean_booking_note(data.get("note"))
     return data
 
 

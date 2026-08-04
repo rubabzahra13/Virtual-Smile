@@ -3344,6 +3344,11 @@ select {
   color: var(--ink-muted);
 }
 
+.ig-pill.is-warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .report-date {
   font-size: 0.76rem;
   font-weight: 500;
@@ -3785,6 +3790,56 @@ select {
 
 .booking-cancel-btn:hover {
   background: rgba(204, 0, 51, 0.14);
+}
+
+.booking-approve-btn {
+  appearance: none;
+  border: none;
+  background: #dcfce7;
+  color: #15803d;
+  border-radius: 999px;
+  padding: 0.38rem 0.8rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast) ease, transform var(--t-fast) ease;
+}
+
+.booking-approve-btn:hover {
+  background: #bbf7d0;
+}
+
+.booking-approve-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.booking-reject-btn {
+  appearance: none;
+  border: none;
+  background: rgba(204, 0, 51, 0.08);
+  color: var(--danger);
+  border-radius: 999px;
+  padding: 0.38rem 0.8rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast) ease, transform var(--t-fast) ease;
+}
+
+.booking-reject-btn:hover {
+  background: rgba(204, 0, 51, 0.14);
+}
+
+.booking-reject-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .booking-cancel-btn:active {
@@ -4614,6 +4669,27 @@ button.data-card { cursor: pointer; }
 .book-slot.is-active:hover {
   background: var(--navy-mid);
   color: #fff;
+}
+
+.book-slot.is-taken,
+.book-slot.is-disabled,
+.book-slot:disabled {
+  background: #fce8e6 !important;
+  color: #c53929 !important;
+  border: 1px solid #f7c6c2 !important;
+  cursor: not-allowed !important;
+  opacity: 0.85 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  text-decoration: line-through;
+}
+
+.book-slot.is-taken:hover,
+.book-slot.is-disabled:hover,
+.book-slot:disabled:hover {
+  background: #fce8e6 !important;
+  color: #c53929 !important;
+  transform: none !important;
 }
 
 .book-slot-empty {

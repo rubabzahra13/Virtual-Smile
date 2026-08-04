@@ -351,12 +351,14 @@
             </div>
             <div class="reports-filter-row">
               <div class="reports-chips" role="group" aria-label="Filter by status">
-                <button type="button" class="reports-chip is-active" data-bookings-status="confirmed">Confirmed</button>
+                <button type="button" class="reports-chip is-active" data-bookings-status="pending">Pending Approval</button>
+                <button type="button" class="reports-chip" data-bookings-status="confirmed">Approved</button>
                 <button type="button" class="reports-chip" data-bookings-status="treated">Treated</button>
-                <button type="button" class="reports-chip" data-bookings-status="cancelled">Cancelled</button>
+                <button type="button" class="reports-chip" data-bookings-status="cancelled">Rejected</button>
+                <button type="button" class="reports-chip" data-bookings-status="all">All</button>
               </div>
             </div>
-            <input type="hidden" id="bookings-status" value="confirmed" />
+            <input type="hidden" id="bookings-status" value="pending" />
           </div>
 
           <div class="bookings-sheet">

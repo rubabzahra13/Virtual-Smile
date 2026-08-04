@@ -1832,7 +1832,8 @@
     if (form) form.hidden = true;
     if (success) success.hidden = false;
     if (copy) {
-      copy.textContent = `You already have an appointment for ${formatBookingSummary(booking)}. Contact the clinic if you need to change it.`;
+      const statusText = booking?.status === "pending" ? "pending approval" : "booked";
+      copy.textContent = `You already have an appointment (${statusText}) for ${formatBookingSummary(booking)}. Contact the clinic if you need to change it.`;
     }
     if (status) setStatus(status, "");
   }
@@ -2437,7 +2438,7 @@
         if (form) form.hidden = true;
         if (success) success.hidden = false;
         if (copy) {
-          copy.textContent = `Thanks ${name.split(" ")[0]}. You’re booked for ${dateLabel} at ${timeLabel}. We’ll confirm by email shortly.`;
+          copy.textContent = `Thanks ${name.split(" ")[0]}. Your appointment request for ${dateLabel} at ${timeLabel} has been submitted (Pending Approval). You will receive a confirmation email once approved by our clinic team.`;
         }
         setStatus(status, "");
       } catch (_err) {
