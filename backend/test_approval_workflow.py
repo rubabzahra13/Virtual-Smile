@@ -48,12 +48,23 @@ def test_booking_approval_workflow():
         "active": True,
     }]
 
-    print("--- 1. Testing POST /api/bookings creation flow ---")
+    print("--- 1. Testing POST /api/bookings creation flow with existing assessment ---")
+    mock_assessment = {
+        "id": "assess-uuid-1",
+        "name": "Approval Test Patient",
+        "email": "testpatient@example.com",
+        "phone": "+923001234567",
+        "gender": "male",
+        "age": 30,
+        "city": "Lahore",
+        "created_at": "2026-08-01T10:00:00Z",
+    }
+
     with patch("booking_api._require_db"), \
          patch("booking_api.get_supabase") as mock_sb, \
          patch("booking_api.fetch_schedules", return_value=mock_schedules), \
          patch("booking_api.fetch_bookings_for_date", return_value=[]), \
-         patch("booking_api.find_confirmed_booking", return_value=None), \
+         patch("booking_api.find_patient_assessment", return_value=mock_assessment), \
          patch("booking_api.send_booking_email") as mock_email:
 
         mock_execute = mock_sb.return_value.table.return_value.insert.return_value.execute
@@ -73,7 +84,40 @@ def test_booking_approval_workflow():
         assert data["status"] == "pending", f"Expected status 'pending', got '{data.get('status')}'"
         assert data["email_sent"] is False, "Confirmation email must NOT be sent upon creation"
         mock_email.assert_not_called()
-        print("✔ Appointment creation defaults to 'pending' and confirmation email is NOT sent.")
+        print("✔ Appointment creation with existing assessment defaults to 'pending'.")
+
+    print("\n--- 1b. Testing POST /api/bookings creation flow WITHOUT assessment (should fail) ---")
+    with patch("booking_api._require_db"), \
+         patch("booking_api.find_patient_assessment", return_value=None):
+
+        payload_no_assess = {
+            "name": "New Patient",
+            "email": "newpatient@example.com",
+            "phone": "+923009876543",
+            "date": "2026-12-25",
+            "time": "15:00",
+            "source": "patient"
+        }
+        res = client.post("/api/bookings", json=payload_no_assess)
+        assert res.status_code == 409, f"Expected 409, got {res.status_code}: {res.text}"
+        assert "assessment" in res.json().get("detail", "").lower(), "Error message must mention assessment requirement"
+        print("✔ Patient booking without prior assessment is correctly blocked.")
+
+    print("\n--- 1c. Testing GET /api/patient/verify-assessment endpoint ---")
+    with patch("booking_api._require_db"), \
+         patch("booking_api.find_patient_assessment") as mock_find:
+
+        mock_find.return_value = mock_assessment
+        res = client.get("/api/patient/verify-assessment?email=testpatient@example.com&phone=%2B923001234567")
+        assert res.status_code == 200
+        assert res.json()["found"] is True
+        assert res.json()["patient"]["name"] == "Approval Test Patient"
+
+        mock_find.return_value = None
+        res = client.get("/api/patient/verify-assessment?email=unknown@example.com&phone=%2B923000000000")
+        assert res.status_code == 200
+        assert res.json()["found"] is False
+        print("✔ GET /api/patient/verify-assessment correctly identifies existing vs new patients.")
 
     print("\n--- 2. Testing Admin Approval via PATCH /admin/api/bookings/{id} ---")
     approved_row = {**mock_row, "status": "approved"}

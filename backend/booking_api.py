@@ -463,6 +463,56 @@ def find_confirmed_booking(*, email: str = "", phone: str = "") -> Optional[dict
     return None
 
 
+def find_patient_assessment(*, email: str = "", phone: str = "") -> Optional[dict]:
+    """Find a completed assessment matching normalized email and/or phone."""
+    email_n = normalize_email(email)
+    phone_n = normalize_phone(phone)
+    if not email_n and not phone_n:
+        return None
+    if not db_ready():
+        return None
+    sb = get_supabase()
+
+    def _lookup_exact() -> Optional[dict]:
+        res = db_retry(
+            lambda: sb.table("assessments")
+            .select("id,name,email,phone,gender,age,city,created_at")
+            .eq("email", email_n)
+            .eq("phone", phone_n)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute(),
+            label="patient assessment lookup exact",
+        )
+        return (res.data or [None])[0]
+
+    def _lookup_field(field: str, val: str) -> Optional[dict]:
+        res = db_retry(
+            lambda: sb.table("assessments")
+            .select("id,name,email,phone,gender,age,city,created_at")
+            .eq(field, val)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute(),
+            label=f"patient assessment lookup {field}",
+        )
+        return (res.data or [None])[0]
+
+    if email_n and phone_n:
+        found = _lookup_exact()
+        if found:
+            return found
+        found = _lookup_field("email", email_n)
+        if found:
+            return found
+        return _lookup_field("phone", phone_n)
+    if email_n:
+        return _lookup_field("email", email_n)
+    if phone_n:
+        return _lookup_field("phone", phone_n)
+    return None
+
+
 def create_booking(body: BookingCreate, *, source: str) -> dict:
     _require_db()
     day = parse_date_input(body.date)
@@ -474,13 +524,16 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
     age = body.age if isinstance(body.age, int) and 1 <= body.age <= 120 else None
     city = (body.city or "").strip() or None
 
-    existing = find_confirmed_booking(email=email_n, phone=phone_n)
-    if existing:
-        when = f"{existing.get('date')} at {str(existing.get('time') or '')[:5]}"
+    is_admin = source == "admin"
+    patient_assessment = find_patient_assessment(email=email_n, phone=phone_n)
+
+    if not is_admin and not patient_assessment:
         raise HTTPException(
             status_code=409,
-            detail=f"You already have an appointment booked for {when}. Contact the clinic to change it.",
+            detail="An assessment must be completed before booking an appointment. Please complete your Virtual Smile Assessment first.",
         )
+
+    assessment_id = body.assessment_id or (patient_assessment.get("id") if patient_assessment else None)
 
     schedules = fetch_schedules()
     day_obj = date_cls.fromisoformat(day)
@@ -509,17 +562,16 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
         )
 
     raw_note = (body.note or "").strip()
-    is_admin = source == "admin"
     note_val = (raw_note or None) if is_admin else (f"[PENDING] {raw_note}".strip() if raw_note else "[PENDING]")
 
     row = {
-        "assessment_id": body.assessment_id or None,
-        "name": name,
+        "assessment_id": assessment_id,
+        "name": name or (patient_assessment.get("name") if patient_assessment else "") or name,
         "email": email_n,
         "phone": phone_n,
-        "gender": gender,
-        "age": age,
-        "city": city,
+        "gender": gender or (patient_assessment.get("gender") if patient_assessment else None),
+        "age": age or (patient_assessment.get("age") if patient_assessment else None),
+        "city": city or (patient_assessment.get("city") if patient_assessment else None),
         "date": day,
         "time": slot,
         "note": note_val,
@@ -538,7 +590,7 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
             ) from e
         elif "column" in msg or "42703" in msg:
             fallback_row = {
-                "assessment_id": body.assessment_id or None,
+                "assessment_id": assessment_id,
                 "name": name,
                 "email": email_n,
                 "phone": phone_n,
@@ -580,6 +632,41 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
 
 
 # ——— Public routes ———
+
+
+@public_router.get("/patient/verify-assessment")
+def api_verify_patient_assessment(
+    email: str = Query(""),
+    phone: str = Query(""),
+):
+    """Verify if a completed assessment exists for this patient's email and phone number."""
+    if not db_ready():
+        return {"found": False, "patient": None, "db": False}
+    email_n = normalize_email(email)
+    phone_n = normalize_phone(phone)
+    if not email_n or not phone_n:
+        return {"found": False, "reason": "Both email address and mobile number are required.", "db": True}
+
+    assessment = find_patient_assessment(email=email_n, phone=phone_n)
+    if not assessment:
+        return {
+            "found": False,
+            "reason": "No completed assessment found for this email address and mobile number. An assessment must be completed before an appointment can be booked.",
+            "db": True,
+        }
+    return {
+        "found": True,
+        "assessment_id": assessment.get("id"),
+        "patient": {
+            "name": assessment.get("name") or "",
+            "email": assessment.get("email") or email_n,
+            "phone": assessment.get("phone") or phone_n,
+            "gender": assessment.get("gender") or "",
+            "age": assessment.get("age"),
+            "city": assessment.get("city") or "",
+        },
+        "db": True,
+    }
 
 
 @public_router.get("/eligibility")

@@ -22,6 +22,7 @@
           <nav class="nav-links" aria-label="Primary">
             <a href="#how" data-go="about">About</a>
             <a href="#assess" data-go="assess">Assessment</a>
+            <a href="#booking" data-go="booking">Booking</a>
           </nav>
         </header>
 
@@ -432,6 +433,43 @@
       </span>
       <span class="chat-fab-label">Ask about report</span>
     </button>
+  </div>
+
+  <div class="book-modal" id="patient-lookup-modal" hidden>
+    <div class="book-modal-backdrop" data-lookup-close></div>
+    <div class="book-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="lookup-modal-title">
+      <div class="book-modal-head">
+        <div>
+          <h3 id="lookup-modal-title">Patient Identification</h3>
+          <p>Enter your email and mobile number to verify your assessment.</p>
+        </div>
+        <button type="button" class="book-modal-close" data-lookup-close aria-label="Close">×</button>
+      </div>
+
+      <form id="lookup-form" class="book-form">
+        <label class="field" for="lookup-email">
+          <span class="field-label">Email address</span>
+          <input type="email" id="lookup-email" name="email" required placeholder="you@email.com" autocomplete="email" />
+          <span class="field-feedback" id="lookup-email-feedback" aria-live="polite"></span>
+        </label>
+        <label class="field" for="lookup-phone">
+          <span class="field-label">Mobile number</span>
+          <span class="phone-input-row">
+            <span class="phone-prefix" aria-hidden="true">+92</span>
+            <input type="tel" id="lookup-phone" name="phone" required placeholder="3XX XXXXXXX" inputmode="numeric" autocomplete="tel-national" maxlength="11" />
+          </span>
+          <span class="field-feedback" id="lookup-phone-feedback" aria-live="polite"></span>
+        </label>
+        <p id="lookup-status" class="status" role="status"></p>
+        <div id="lookup-no-assessment" class="lookup-notice-card" hidden>
+          <div class="lookup-notice-icon">📋</div>
+          <h4>Assessment Required</h4>
+          <p>We couldn't find a completed Virtual Smile Assessment for these credentials. Patients must complete an assessment before booking an appointment.</p>
+          <button type="button" class="btn btn-primary" id="go-to-assessment-btn">Start Assessment</button>
+        </div>
+        <button type="submit" class="btn btn-primary" id="lookup-submit">Verify &amp; Continue to Booking</button>
+      </form>
+    </div>
   </div>
 
   <div class="book-modal" id="book-modal" hidden>

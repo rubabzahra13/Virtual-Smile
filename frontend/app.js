@@ -1434,6 +1434,10 @@
       showAboutFlow();
       return;
     }
+    if (target === "booking") {
+      openPatientLookupModal();
+      return;
+    }
     showAssessInHero();
   }
 
@@ -2164,13 +2168,6 @@
       if (success) success.hidden = true;
       if (status) setStatus(status, "");
 
-      if (existingBooking) {
-        showAlreadyBookedState(existingBooking);
-        modal.hidden = false;
-        document.body.classList.add("book-open");
-        return;
-      }
-
       const bookName = $("#book-name");
       const email = $("#book-email");
       const phone = $("#book-phone");
@@ -2360,10 +2357,6 @@
     $("#book-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (bookSubmitting) return;
-      if (existingBooking) {
-        showAlreadyBookedState(existingBooking);
-        return;
-      }
       updateBookSubmitEnabled(true);
       const name = $("#book-name")?.value.trim() || state.name || "";
       const email = (state.email || $("#book-email")?.value.trim() || "");
@@ -2414,13 +2407,6 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const detail = typeof data.detail === "string" ? data.detail : "Could not book that slot.";
-          if (/already have an appointment/i.test(detail)) {
-            existingBooking = await fetchExistingBooking();
-            if (existingBooking) {
-              showAlreadyBookedState(existingBooking);
-              return;
-            }
-          }
           if (res.status === 409 && date) {
             await loadBookFreeSlots(date);
             await renderBookCalendar();
@@ -2449,6 +2435,114 @@
     });
   }
 
+  function openPatientLookupModal() {
+    const modal = $("#patient-lookup-modal");
+    if (!modal) return;
+    const status = $("#lookup-status");
+    const notice = $("#lookup-no-assessment");
+    const emailInput = $("#lookup-email");
+    const phoneInput = $("#lookup-phone");
+
+    if (notice) notice.hidden = true;
+    if (status) setStatus(status, "");
+
+    if (emailInput) emailInput.value = state.email || "";
+    if (phoneInput) {
+      if (state.phone) {
+        const digits = state.phone.replace(/\D/g, "");
+        phoneInput.value = digits.startsWith("92") ? digits.slice(2) : digits.replace(/^0/, "");
+      } else {
+        phoneInput.value = "";
+      }
+    }
+
+    modal.hidden = false;
+    document.body.classList.add("book-open");
+    if (!emailInput?.value) emailInput?.focus();
+    else if (!phoneInput?.value) phoneInput?.focus();
+  }
+
+  function closePatientLookupModal() {
+    const modal = $("#patient-lookup-modal");
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove("book-open");
+  }
+
+  function initPatientLookupModal() {
+    $$("[data-lookup-close]").forEach((el) => {
+      el.addEventListener("click", closePatientLookupModal);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("#patient-lookup-modal")?.hidden) {
+        closePatientLookupModal();
+      }
+    });
+
+    const goToAssessBtn = $("#go-to-assessment-btn");
+    if (goToAssessBtn) {
+      goToAssessBtn.addEventListener("click", () => {
+        closePatientLookupModal();
+        showAppFlow("assess");
+      });
+    }
+
+    const form = $("#lookup-form");
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = $("#lookup-email")?.value.trim();
+        const phoneRaw = $("#lookup-phone")?.value.trim();
+        const status = $("#lookup-status");
+        const notice = $("#lookup-no-assessment");
+        const submitBtn = $("#lookup-submit");
+
+        if (notice) notice.hidden = true;
+        if (!email || !phoneRaw) {
+          if (status) setStatus(status, "Please enter both your email address and mobile number.", true);
+          return;
+        }
+
+        const phoneDigits = phoneRaw.replace(/\D/g, "");
+        const normalizedPhone = "+92" + (phoneDigits.startsWith("92") ? phoneDigits.slice(2) : phoneDigits.replace(/^0/, ""));
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Verifying…";
+        }
+        if (status) setStatus(status, "Checking assessment records…");
+
+        try {
+          const res = await fetch(`/api/patient/verify-assessment?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(normalizedPhone)}`);
+          const data = await res.json();
+          if (res.ok && data.found && data.patient) {
+            state.email = data.patient.email || email;
+            state.phone = data.patient.phone || normalizedPhone;
+            state.name = data.patient.name || "";
+            state.gender = data.patient.gender || "";
+            state.age = data.patient.age || null;
+            state.city = data.patient.city || "";
+            state.assessment_id = data.assessment_id || null;
+
+            closePatientLookupModal();
+            openBookModal();
+          } else {
+            if (status) setStatus(status, "");
+            if (notice) notice.hidden = false;
+          }
+        } catch (_err) {
+          if (status) setStatus(status, "Network error. Please try again.", true);
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Verify & Continue to Booking";
+          }
+        }
+      });
+    }
+  }
+
   document.querySelectorAll("[data-go]").forEach((el) => {
     el.addEventListener("click", (e) => {
       const go = el.getAttribute("data-go");
@@ -2471,4 +2565,5 @@
   showHeroOnly();
   initHeroSlider();
   initBookingModal();
+  initPatientLookupModal();
 })();
