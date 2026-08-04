@@ -936,6 +936,85 @@ def send_cancellation_email(
     )
 
 
+def build_rejection_email_html(
+    *,
+    name: str,
+    email: str,
+    phone: str,
+    day: str,
+    time_slot: str,
+    reason: str = "",
+) -> str:
+    greeting_name = (name or "").strip() or (email or "").split("@", 1)[0].replace(".", " ").strip()
+    greeting = f"Hello {greeting_name}," if greeting_name else "Hello,"
+    date_label = _format_booking_date(day)
+    time_label = _format_booking_time(time_slot)
+    reason_html = f"<p><strong>Note:</strong> {_esc(reason)}</p>" if reason else ""
+    return f"""
+<!DOCTYPE html>
+<html>
+<body style="font-family:Georgia,serif;color:#1a2a4a;line-height:1.55;max-width:640px;margin:0 auto;padding:24px;">
+  <p>{_esc(greeting)}</p>
+  <p>
+    Thank you for requesting an appointment with The Global Dentist. We regret to inform you that your appointment request for the requested time slot could not be confirmed at this time.
+  </p>
+  {reason_html}
+  <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:15px;">
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#5a6a80;width:120px;">Requested Date</td>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#183068;font-weight:bold;">{_esc(date_label)}</td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#5a6a80;">Requested Time</td>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#183068;font-weight:bold;">{_esc(time_label)}</td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#5a6a80;">Name</td>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#183068;">{_esc(name or "-")}</td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#5a6a80;">Email</td>
+      <td style="padding:10px 0;border-bottom:1px solid #d9e2ef;color:#183068;">{_esc(email or "-")}</td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;color:#5a6a80;">Phone</td>
+      <td style="padding:10px 0;color:#183068;">{_esc(phone or "-")}</td>
+    </tr>
+  </table>
+  <p>
+    You are welcome to select another available time slot or contact our practice directly for assistance.
+  </p>
+  <p style="font-size:13px;color:#5a6a80;">The Global Dentist</p>
+</body>
+</html>
+""".strip()
+
+
+def send_rejection_email(
+    *,
+    to_email: str,
+    name: str,
+    phone: str,
+    day: str,
+    time_slot: str,
+    reason: str = "",
+) -> bool:
+    html_content = build_rejection_email_html(
+        name=name,
+        email=to_email,
+        phone=phone,
+        day=day,
+        time_slot=time_slot,
+        reason=reason,
+    )
+    return _brevo_send(
+        to_email=to_email,
+        subject="Your appointment request update - The Global Dentist",
+        html_content=html_content,
+        skip_label="rejection email",
+    )
+
+
 def send_assessment_email(
     *,
     to_email: str,

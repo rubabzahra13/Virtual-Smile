@@ -2021,7 +2021,7 @@
         return;
       }
       if (kind === "reject") {
-        await api(`/admin/api/bookings/${pendingConfirm.id}`, {
+        const data = await api(`/admin/api/bookings/${pendingConfirm.id}`, {
           method: "PATCH",
           body: JSON.stringify({ status: "rejected" }),
         });
@@ -2029,6 +2029,9 @@
         if (ghost) ghost.disabled = false;
         loadBookings();
         loadStats();
+        if (data?.email_sent === false) {
+          alert("Appointment rejected, but the rejection email could not be sent.");
+        }
         return;
       }
       if (kind === "cancel") {

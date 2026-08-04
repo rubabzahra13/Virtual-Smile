@@ -97,11 +97,12 @@ def test_booking_approval_workflow():
         print("✔ Approving appointment sets status to 'approved' and triggers confirmation email.")
 
     print("\n--- 3. Testing Admin Rejection via PATCH /admin/api/bookings/{id} ---")
-    rejected_row = {**mock_row, "status": "rejected"}
+    rejected_row = {**mock_row, "status": "cancelled", "note": "[REJECTED] Test Note"}
     with patch("booking_api._require_db"), \
          patch("booking_api.require_admin", return_value="admin"), \
          patch("booking_api.get_supabase") as mock_sb, \
-         patch("booking_api.send_booking_email") as mock_email:
+         patch("booking_api.send_booking_email") as mock_confirm_email, \
+         patch("booking_api.send_rejection_email", return_value=True) as mock_reject_email:
 
         mock_sb.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [mock_row]
         mock_sb.return_value.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [rejected_row]
@@ -111,10 +112,12 @@ def test_booking_approval_workflow():
         assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
         data = res.json()
         assert data["status"] == "rejected", f"Expected status 'rejected', got '{data.get('status')}'"
-        mock_email.assert_not_called()
-        print("✔ Rejecting appointment sets status to 'rejected' and does NOT trigger confirmation email.")
+        assert data["email_sent"] is True, "Rejection email must be sent upon rejection"
+        mock_confirm_email.assert_not_called()
+        mock_reject_email.assert_called_once()
+        print("✔ Rejecting appointment sets status to 'rejected' and triggers rejection email.")
 
-    print("\nALL APPROVAL WORKFLOW TESTS PASSED SUCCESSFULLY!")
+    print("\nALL APPROVAL & REJECTION WORKFLOW TESTS PASSED SUCCESSFULLY!")
 
 
 if __name__ == "__main__":

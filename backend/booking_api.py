@@ -25,6 +25,7 @@ from email_report import (
     send_assessment_email,
     send_booking_email,
     send_cancellation_email,
+    send_rejection_email,
 )
 from photo_storage import (
     download_assessment_photo_bytes,
@@ -1343,6 +1344,7 @@ def admin_patch_booking(
         and cur_status not in {"approved", "confirmed"}
     )
     if becoming_approved:
+        logger.info("Triggering confirmation email for booking %s", booking_id)
         try:
             sent = send_booking_email(
                 to_email=str(data.get("email") or cur.get("email") or ""),
@@ -1353,14 +1355,36 @@ def admin_patch_booking(
                 note=str(clean_booking_note(data.get("note")) or ""),
             )
             data["email_sent"] = bool(sent)
+            logger.info("Confirmation email sent status for booking %s: %s", booking_id, sent)
         except Exception:
             logger.exception("Booking confirmation email failed for booking %s", booking_id)
+            data["email_sent"] = False
+
+    becoming_rejected = (
+        body.status == "rejected" and cur_status != "rejected"
+    )
+    if becoming_rejected:
+        logger.info("Triggering rejection email for booking %s", booking_id)
+        try:
+            sent = send_rejection_email(
+                to_email=str(data.get("email") or cur.get("email") or ""),
+                name=str(data.get("name") or cur.get("name") or ""),
+                phone=str(data.get("phone") or cur.get("phone") or ""),
+                day=str(data.get("date") or cur.get("date") or ""),
+                time_slot=str(data.get("time") or cur.get("time") or "")[:5],
+                reason=str(clean_booking_note(data.get("note")) or ""),
+            )
+            data["email_sent"] = bool(sent)
+            logger.info("Rejection email sent status for booking %s: %s", booking_id, sent)
+        except Exception:
+            logger.exception("Rejection email failed for booking %s", booking_id)
             data["email_sent"] = False
 
     becoming_cancelled = (
         body.status == "cancelled" and cur_status != "cancelled"
     )
     if becoming_cancelled:
+        logger.info("Triggering cancellation email for booking %s", booking_id)
         try:
             sent = send_cancellation_email(
                 to_email=str(data.get("email") or cur.get("email") or ""),
@@ -1370,6 +1394,7 @@ def admin_patch_booking(
                 time_slot=str(data.get("time") or cur.get("time") or "")[:5],
             )
             data["email_sent"] = bool(sent)
+            logger.info("Cancellation email sent status for booking %s: %s", booking_id, sent)
         except Exception:
             logger.exception("Cancellation email failed for booking %s", booking_id)
             data["email_sent"] = False
