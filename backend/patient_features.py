@@ -8,8 +8,8 @@ import json
 import os
 import time
 import urllib.error
-import urllib.request
 from typing import Optional
+from language_utils import detect_chat_language
 
 
 def build_chat_prompt(
@@ -17,7 +17,11 @@ def build_chat_prompt(
     report_text: str,
     overall_score: Optional[int],
     history: Optional[list] = None,
+    target_lang: Optional[str] = None,
 ) -> str:
+    if not target_lang:
+        target_lang = detect_chat_language(question)
+
     score_line = f"Overall Smile Score: {overall_score}/100\n" if overall_score is not None else ""
 
     history_block = ""
@@ -39,9 +43,31 @@ def build_chat_prompt(
                 + "\n"
             )
 
+    if target_lang == "ENGLISH":
+        lang_instruction = (
+            "CRITICAL RESPONSE LANGUAGE REQUIREMENT:\n"
+            "- You MUST respond strictly in plain ENGLISH.\n"
+            "- Do NOT translate into Urdu or Roman Urdu.\n"
+            "- Do NOT use Hindi script (Devanagari) or Urdu script.\n"
+        )
+    else:
+        lang_instruction = (
+            "CRITICAL RESPONSE LANGUAGE REQUIREMENT:\n"
+            "- You MUST respond strictly in ROMAN URDU (Urdu written using standard English/Latin alphabets, e.g. 'Aap ko registration complete karni hogi...').\n"
+            "- Do NOT respond in English language.\n"
+            "- Do NOT write in Urdu script or Hindi (Devanagari) script.\n"
+        )
+
     return f"""You are a friendly dental clinic assistant for The Global Dentist.
+
+{lang_instruction}
+ABSOLUTE SCRIPT RESTRICTION:
+- NEVER output Hindi / Devanagari script (e.g. हिन्दी, नमस्कार, आदि).
+- NEVER output Urdu / Arabic script (e.g. اردو, مجھے, etc.).
+- Supported output characters are ONLY standard English / Latin alphabet letters.
+
 Answer the patient's question using ONLY the assessment report below, and the prior conversation if provided.
-Use simple plain English. Do not invent new findings.
+Do not invent new findings.
 Refer back to earlier questions and your previous answers when relevant so the chat feels continuous.
 Always remind them this is a preliminary AI assessment, not a diagnosis, when giving treatment advice.
 Keep answers concise (3-6 short sentences).

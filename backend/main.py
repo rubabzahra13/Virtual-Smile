@@ -31,8 +31,9 @@ from analysis import run_analysis
 from booking_api import admin_router, check_eligibility, persist_assessment, public_router
 from db import db_ready
 from groq_comparison import run_groq_comparison
+from language_utils import contains_forbidden_script, detect_chat_language
 from patient_features import build_chat_prompt, create_smile_simulation
-from providers import call_groq_text
+from providers import call_gemini_text, call_groq_text, call_provider_text
 from report import build_groq_comparison_report, build_report
 
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
@@ -89,7 +90,7 @@ MODEL_OPTIONS = {
 }
 
 DEFAULT_TWO_PASS = os.getenv("TWO_PASS_ENABLED", "true").lower() in ("1", "true", "yes")
-DEFAULT_PATIENT_MODEL = os.getenv("PATIENT_CHAT_MODEL", "llama-3.1-8b-instant")
+DEFAULT_PATIENT_MODEL = os.getenv("PATIENT_CHAT_MODEL", "gemini-3.5-flash-lite")
 DEFAULT_ANALYSIS_MODEL = os.getenv("GEMINI_ANALYSIS_MODEL", "gemini-3.5-flash-lite")
 DEFAULT_QUALITY_MODEL = os.getenv("GEMINI_QUALITY_MODEL", "gemini-3.5-flash-lite")
 ANALYSIS_CACHE_MAX_ITEMS = int(os.getenv("ANALYSIS_CACHE_MAX_ITEMS", "300"))
@@ -498,25 +499,56 @@ async def analyze(
 
 @app.post("/chat")
 async def chat(payload: ChatRequest):
+    target_lang = detect_chat_language(payload.question)
     prompt = build_chat_prompt(
         question=payload.question,
         report_text=payload.report_text,
         overall_score=payload.overall_score,
         history=[m.model_dump() for m in payload.history],
+        target_lang=target_lang,
     )
+
+    chat_model = DEFAULT_PATIENT_MODEL
     try:
-        usage = call_groq_text(prompt, model=DEFAULT_PATIENT_MODEL)
+        if "gemini" in chat_model.lower():
+            usage = call_gemini_text(prompt, model=chat_model)
+        else:
+            usage = call_groq_text(prompt, model=chat_model)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Chat failed: {type(e).__name__}: {e}")
 
     answer = (usage.get("raw_text") or "").strip()
+
+    # Safety check: if forbidden Hindi (Devanagari) or Urdu script is present, retry with strong correction directive
+    if contains_forbidden_script(answer):
+        correction_prompt = (
+            f"CRITICAL OVERRIDE DIRECTIVE:\n"
+            f"Your previous response contained forbidden script characters (Hindi Devanagari or Urdu script).\n"
+            f"You MUST rewrite your answer using ONLY Latin/English letters in {'ENGLISH' if target_lang == 'ENGLISH' else 'ROMAN URDU'}.\n"
+            f"DO NOT output Hindi or Urdu script characters under any circumstances.\n\n"
+            f"Original patient question: {payload.question}\n"
+            f"Previous prohibited attempt: {answer[:300]}"
+        )
+        try:
+            if "gemini" in chat_model.lower():
+                retry_usage = call_gemini_text(correction_prompt, model=chat_model)
+            else:
+                retry_usage = call_groq_text(correction_prompt, model=chat_model)
+            retry_answer = (retry_usage.get("raw_text") or "").strip()
+            if retry_answer and not contains_forbidden_script(retry_answer):
+                answer = retry_answer
+                usage = retry_usage
+        except Exception:
+            pass
+
     if not answer:
         raise HTTPException(status_code=502, detail="Chat model returned an empty answer.")
 
     return {
         "answer": answer,
+        "target_language": target_lang,
         "usage": {
             "input_tokens": usage.get("input_tokens"),
             "output_tokens": usage.get("output_tokens"),
