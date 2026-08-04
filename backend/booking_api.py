@@ -533,6 +533,24 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
             detail="An assessment must be completed before booking an appointment. Please complete your Virtual Smile Assessment first.",
         )
 
+    final_name = name or (patient_assessment.get("name") if patient_assessment else "") or ""
+    final_gender = (body.gender or (patient_assessment.get("gender") if patient_assessment else "") or "").strip() or None
+    final_age = body.age if isinstance(body.age, int) and 1 <= body.age <= 120 else (patient_assessment.get("age") if patient_assessment and isinstance(patient_assessment.get("age"), int) else None)
+    final_city = (body.city or (patient_assessment.get("city") if patient_assessment else "") or "").strip() or None
+
+    if not final_name:
+        raise HTTPException(status_code=400, detail="Full name is required.")
+    if not email_n:
+        raise HTTPException(status_code=400, detail="Email is required.")
+    if not phone_n:
+        raise HTTPException(status_code=400, detail="Phone number is required.")
+    if not final_gender:
+        raise HTTPException(status_code=400, detail="Gender is required.")
+    if final_age is None:
+        raise HTTPException(status_code=400, detail="Age is required.")
+    if not final_city:
+        raise HTTPException(status_code=400, detail="City is required.")
+
     assessment_id = body.assessment_id or (patient_assessment.get("id") if patient_assessment else None)
 
     schedules = fetch_schedules()
@@ -566,12 +584,12 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
 
     row = {
         "assessment_id": assessment_id,
-        "name": name or (patient_assessment.get("name") if patient_assessment else "") or name,
+        "name": final_name,
         "email": email_n,
         "phone": phone_n,
-        "gender": gender or (patient_assessment.get("gender") if patient_assessment else None),
-        "age": age or (patient_assessment.get("age") if patient_assessment else None),
-        "city": city or (patient_assessment.get("city") if patient_assessment else None),
+        "gender": final_gender,
+        "age": final_age,
+        "city": final_city,
         "date": day,
         "time": slot,
         "note": note_val,

@@ -405,8 +405,8 @@
               </div>
               <div class="field-row-split" style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                 <div class="field">
-                  <label for="w-gender" class="field-label">Gender <span class="field-optional">(optional)</span></label>
-                  <select id="w-gender" class="admin-select">
+                  <label for="w-gender" class="field-label">Gender</label>
+                  <select id="w-gender" class="admin-select" required>
                     <option value="">Select gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -415,14 +415,14 @@
                   </select>
                 </div>
                 <div class="field">
-                  <label for="w-age" class="field-label">Age <span class="field-optional">(optional)</span></label>
-                  <input id="w-age" type="number" min="1" max="120" placeholder="e.g. 28" inputmode="numeric" />
+                  <label for="w-age" class="field-label">Age</label>
+                  <input id="w-age" type="number" min="1" max="120" placeholder="e.g. 28" inputmode="numeric" required />
                 </div>
               </div>
               <div class="field city-autocomplete-field" id="w-city-autocomplete-wrap" style="position:relative;">
-                <label for="w-city" class="field-label">City <span class="field-optional">(optional)</span></label>
+                <label for="w-city" class="field-label">City</label>
                 <div class="autocomplete-control">
-                  <input type="text" id="w-city" placeholder="Search or select city (Pakistan)" autocomplete="off" />
+                  <input type="text" id="w-city" placeholder="Search or select city (Pakistan)" autocomplete="off" required />
                   <button type="button" class="autocomplete-toggle" id="w-city-toggle-btn" aria-label="Toggle city list" tabindex="-1">▼</button>
                 </div>
                 <ul class="autocomplete-list" id="w-city-dropdown-list" hidden role="listbox"></ul>

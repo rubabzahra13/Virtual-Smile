@@ -3842,16 +3842,26 @@
   $("#walkin-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = $("#walkin-status");
+    const name = $("#w-name")?.value.trim() || "";
+    const email = $("#w-email")?.value.trim() || "";
+    const phone = $("#w-phone")?.value.trim() || "";
+    const gender = $("#w-gender")?.value || "";
+    const ageVal = $("#w-age")?.value.trim() || "";
+    const rawCity = $("#w-city")?.value.trim() || "";
+    const finalCity = rawCity === "Other" ? ($("#w-other-city")?.value.trim() || "") : rawCity;
+
+    if (!name || !email || !phone || !gender || !ageVal || !finalCity) {
+      status.textContent = "Please fill out all required fields: Name, Phone, Email, Gender, Age, and City.";
+      status.className = "status is-error";
+      return;
+    }
+
     const timeVal = $("#w-time")?.value || "";
     if (!$("#w-date")?.value || !timeVal) {
       status.textContent = "Choose a date and an available time from clinic hours.";
       status.className = "status is-error";
       return;
     }
-
-    const rawCity = $("#w-city")?.value.trim() || "";
-    const finalCity = rawCity === "Other" ? ($("#w-other-city")?.value.trim() || "Other") : rawCity;
-    const ageVal = $("#w-age")?.value.trim();
 
     status.textContent = "Saving…";
     status.className   = "status";
