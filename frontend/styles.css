@@ -1615,6 +1615,104 @@ body.flow-open .hero-shell.is-assessing .hero-card {
   line-height: 1.4;
 }
 
+/* Returning Patient Styles */
+.returning-patient-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.15rem;
+  margin: 0 0 1.25rem 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f0fdf9 0%, #e6f7f5 100%);
+  border: 1px solid rgba(0, 152, 152, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 152, 152, 0.05);
+}
+
+.returning-patient-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.returning-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 152, 152, 0.15);
+  color: var(--teal-dark, #0e8a94);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.returning-patient-copy p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #334155;
+  line-height: 1.4;
+}
+
+#btn-view-previous {
+  flex-shrink: 0;
+  white-space: nowrap;
+  border: 1px solid rgba(0, 152, 152, 0.35);
+  background: #ffffff;
+  color: var(--teal-dark, #0e8a94);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+#btn-view-previous:hover {
+  background: #009898;
+  color: #ffffff;
+  border-color: #009898;
+  box-shadow: 0 4px 12px rgba(0, 152, 152, 0.2);
+}
+
+.returning-welcome-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+}
+
+.returning-welcome-banner[hidden] {
+  display: none !important;
+}
+
+.returning-banner-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.returning-banner-body h4 {
+  margin: 0 0 0.2rem 0;
+  color: #1e3a8a;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.returning-banner-body p {
+  margin: 0;
+  color: #2563eb;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .results-hero {
   display: flex;
   flex-direction: column;

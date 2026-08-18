@@ -837,6 +837,20 @@
     return /already taken an assessment/i.test(String(text || ""));
   }
 
+  async function fetchPatientAssessment(email, phone) {
+    const url = `/api/patient/assessment?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      return data;
+    } catch (_err) {
+      return {
+        found: false,
+        reason: "Could not retrieve your assessment. Please try again.",
+      };
+    }
+  }
+
   async function fetchEligibility(email, phone) {
     const url = `/api/eligibility?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`;
     let lastFailure = null;
@@ -862,6 +876,7 @@
             status: "blocked",
             data: {
               ok: false,
+              returning_patient: false,
               field: /mobile|phone/i.test(detail) ? "phone" : "email",
               reason: detail,
             },
@@ -918,6 +933,15 @@
     try {
       const result = await fetchEligibility(email, phone);
       if (result.status === "blocked") {
+        if (result.data?.returning_patient) {
+          // Returning patient found: load their previous assessment directly
+          const assessRes = await fetchPatientAssessment(email, phone);
+          if (assessRes && assessRes.found && assessRes.assessment) {
+            btn.textContent = prevLabel;
+            displayAssessmentResults(assessRes.assessment, true);
+            return;
+          }
+        }
         applyEligibilityBlock(result.data?.field, result.data?.reason);
         btn.textContent = prevLabel;
         updateContinueEnabled(true);
@@ -947,6 +971,70 @@
       updateContinueEnabled(true);
     }
   });
+
+  const btnViewPrevious = $("#btn-view-previous");
+  if (btnViewPrevious) {
+    btnViewPrevious.addEventListener("click", async () => {
+      const emailEl = $("#user-email");
+      const phoneEl = $("#user-phone");
+      const email = emailEl?.value.trim() || "";
+      const rawPhone = phoneEl?.value.trim() || "";
+      const phone = formatPakistaniPhone(rawPhone);
+
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const phoneValid = isValidPakistaniMobile(rawPhone);
+
+      if (!email || !emailValid || !rawPhone || !phoneValid) {
+        if (!email) {
+          setFieldFeedback("#email-feedback", "Email is required to view your previous assessment.", false);
+        } else if (!emailValid) {
+          setFieldFeedback("#email-feedback", "Enter a valid email address.", false);
+        }
+        if (!rawPhone) {
+          setFieldFeedback("#phone-feedback", "Mobile number is required to view your previous assessment.", false);
+        } else if (!phoneValid) {
+          setFieldFeedback("#phone-feedback", "Enter a valid Pakistani mobile number (e.g. 300 1234567).", false);
+        }
+        const status = $("#details-status");
+        if (status) {
+          setStatus(status, "Please enter your Email address and Mobile number to view your previous assessment.", true);
+        }
+        if (!emailValid && emailEl) emailEl.focus();
+        else if (!phoneValid && phoneEl) phoneEl.focus();
+        return;
+      }
+
+      clearEligibilityBlock();
+      const prevText = btnViewPrevious.textContent;
+      btnViewPrevious.disabled = true;
+      btnViewPrevious.textContent = "Checking…";
+      const status = $("#details-status");
+      if (status) setStatus(status, "Looking up your previous assessment…");
+
+      try {
+        const assessRes = await fetchPatientAssessment(email, phone);
+        if (assessRes && assessRes.found && assessRes.assessment) {
+          if (status) setStatus(status, "");
+          displayAssessmentResults(assessRes.assessment, true);
+        } else {
+          if (status) {
+            setStatus(
+              status,
+              assessRes?.reason || "No previous assessment was found for these details. You can continue with a new assessment.",
+              false
+            );
+          }
+        }
+      } catch (_err) {
+        if (status) {
+          setStatus(status, "Could not look up your previous assessment. Please try again.", true);
+        }
+      } finally {
+        btnViewPrevious.disabled = false;
+        btnViewPrevious.textContent = prevText;
+      }
+    });
+  }
 
   function setFieldFeedback(id, message, ok) {
     const el = $(id);
@@ -1278,16 +1366,130 @@
 
   $("#back-to-details").addEventListener("click", () => showStep(1));
 
+  function displayAssessmentResults(data, isReturning = false) {
+    state.reportText = data.report_text || "";
+    state.findings = data.findings || null;
+    state.overallScore = data.overall_score;
+    state.rawOutput = data.raw_model_output || "";
+    state.simulationAllowed = data.simulation_allowed !== false;
+    state.categoryScores = extractCategoryScores(data, state.reportText);
+    state.assessmentId = data.id || data.assessment_id || null;
+    if (data.name) state.name = data.name;
+    if (data.email) state.email = data.email;
+    if (data.phone) state.phone = data.phone;
+    if (data.gender) state.gender = data.gender;
+    if (data.age) state.age = data.age;
+    if (data.city) state.city = data.city;
+
+    // Welcome Back banner for returning patients
+    const welcomeBanner = $("#returning-welcome-banner");
+    if (welcomeBanner) {
+      welcomeBanner.hidden = !isReturning;
+    }
+
+    const summaryEl = $("#results-summary");
+    if (summaryEl) {
+      if (isReturning) {
+        summaryEl.textContent = "Here are your previously completed assessment results.";
+      } else {
+        summaryEl.textContent = data.parsed_ok !== false
+          ? "Here’s your preliminary visual assessment and Smile Score."
+          : "We generated a report, but some scoring fields could not be parsed cleanly.";
+      }
+    }
+    setScoreRing(state.overallScore);
+    renderCategories(state.categoryScores);
+    renderPatientFindings(state.findings);
+
+    const rName = $("#report-patient-name");
+    const rEmail = $("#report-patient-email");
+    const rPhone = $("#report-patient-phone");
+    const rGender = $("#report-patient-gender");
+    const rAge = $("#report-patient-age");
+    const rCity = $("#report-patient-city");
+    if (rName) rName.textContent = state.name || data.name || "-";
+    if (rEmail) rEmail.textContent = state.email || data.email || "-";
+    if (rPhone) rPhone.textContent = state.phone || data.phone || "-";
+    if (rGender) rGender.textContent = state.gender || data.gender || "-";
+    if (rAge) rAge.textContent = state.age || data.age || "-";
+    if (rCity) rCity.textContent = state.city || data.city || "-";
+
+    const before = $("#sim-before");
+    const after = $("#sim-after");
+    const simBlock = $("#sim-block");
+    const simSkipNote = $("#sim-skip-note");
+    const simGenCard = $("#sim-generation-card");
+
+    const simUrl = data.photos?.simulation || (data.findings?.photo_simulation_path ? data.photos?.simulation : null);
+    const frontUrl = data.photos?.front || (state.frontFile ? URL.createObjectURL(state.frontFile) : "");
+
+    if (simUrl) {
+      if (simBlock) simBlock.hidden = false;
+      if (simGenCard) simGenCard.hidden = true;
+      if (simSkipNote) simSkipNote.hidden = true;
+      if (before && frontUrl) before.src = frontUrl;
+      if (after) {
+        after.src = simUrl;
+        after.hidden = false;
+      }
+      setStatus($("#sim-status"), "Illustrative visual preview of potential treatment outcomes.");
+    } else if (state.simulationAllowed) {
+      if (simBlock) simBlock.hidden = true;
+      if (simGenCard) {
+        simGenCard.hidden = false;
+        const btn = $("#generate-sim");
+        if (btn) {
+          btn.hidden = false;
+          btn.disabled = false;
+        }
+        setStatus($("#sim-gen-status"), "");
+      }
+      if (simSkipNote) simSkipNote.hidden = true;
+      if (before && frontUrl) before.src = frontUrl;
+      if (after) {
+        after.src = "";
+      }
+      setStatus($("#sim-status"), "");
+    } else {
+      if (simBlock) simBlock.hidden = true;
+      if (simGenCard) simGenCard.hidden = true;
+      if (simSkipNote) simSkipNote.hidden = false;
+    }
+
+    $("#chat-log").innerHTML = "";
+    if (Array.isArray(data.chat_history) && data.chat_history.length > 0) {
+      let userCount = 0;
+      data.chat_history.forEach((msg) => {
+        const isBot = msg.role === "assistant" || msg.role === "bot";
+        addChatBubble(msg.content, isBot ? "bot" : "user");
+        if (!isBot) userCount++;
+      });
+      state.chatUsed = userCount;
+      updateChatLimitUI();
+    } else {
+      resetChatLimit();
+      addChatBubble(
+        "Hi, I’ve reviewed your assessment. Ask me anything about your Smile Score or next steps.",
+        "bot"
+      );
+    }
+
+    showStep(3);
+  }
+
   $("#run-analysis").addEventListener("click", async () => {
-    if (!state.frontFile) return;
     const status = $("#analyze-status");
     const btn = $("#run-analysis");
+    if (!state.frontFile || state.photosLocked) return;
+
     btn.disabled = true;
     setPhotosLocked(true);
-    setStatus(status, "Analysing your smile… this usually takes a few seconds.");
+    setStatus(status, "Analysing smile photos and generating clinical assessment…");
 
     const formData = new FormData();
     formData.append("front_image", state.frontFile);
+    if (state.leftFile) formData.append("left_image", state.leftFile);
+    if (state.rightFile) formData.append("right_image", state.rightFile);
     formData.append("provider", state.provider);
     formData.append("model", state.model);
     formData.append("quality_model", state.qualityModel);
@@ -1318,74 +1520,7 @@
         throw new Error(msg);
       }
 
-      state.reportText = data.report_text || "";
-      state.findings = data.findings || null;
-      state.overallScore = data.overall_score;
-      state.rawOutput = data.raw_model_output || "";
-      state.simulationAllowed = data.simulation_allowed !== false;
-      state.categoryScores = extractCategoryScores(data, state.reportText);
-      state.assessmentId = data.assessment_id || null;
-
-      const summaryEl = $("#results-summary");
-      if (summaryEl) {
-        summaryEl.textContent = data.parsed_ok
-          ? "Here’s your preliminary visual assessment and Smile Score."
-          : "We generated a report, but some scoring fields could not be parsed cleanly.";
-      }
-      setScoreRing(state.overallScore);
-      renderCategories(state.categoryScores);
-      renderPatientFindings(state.findings);
-
-      const rName = $("#report-patient-name");
-      const rEmail = $("#report-patient-email");
-      const rPhone = $("#report-patient-phone");
-      const rGender = $("#report-patient-gender");
-      const rAge = $("#report-patient-age");
-      const rCity = $("#report-patient-city");
-      if (rName) rName.textContent = state.name || data.name || "-";
-      if (rEmail) rEmail.textContent = state.email || data.email || "-";
-      if (rPhone) rPhone.textContent = state.phone || data.phone || "-";
-      if (rGender) rGender.textContent = state.gender || data.gender || "-";
-      if (rAge) rAge.textContent = state.age || data.age || "-";
-      if (rCity) rCity.textContent = state.city || data.city || "-";
-
-      const before = $("#sim-before");
-      const simBlock = $("#sim-block");
-      const simSkipNote = $("#sim-skip-note");
-      const simGenCard = $("#sim-generation-card");
-      
-      if (simBlock) simBlock.hidden = true;
-      
-      if (state.simulationAllowed) {
-        if (simGenCard) {
-          simGenCard.hidden = false;
-          const btn = $("#generate-sim");
-          if (btn) {
-            btn.hidden = false;
-            btn.disabled = false;
-          }
-          setStatus($("#sim-gen-status"), "");
-        }
-        if (simSkipNote) simSkipNote.hidden = true;
-        if (before) before.src = URL.createObjectURL(state.frontFile);
-        const after = $("#sim-after");
-        if (after) {
-          after.src = "";
-        }
-        setStatus($("#sim-status"), "");
-      } else {
-        if (simGenCard) simGenCard.hidden = true;
-        if (simSkipNote) simSkipNote.hidden = false;
-      }
-
-      $("#chat-log").innerHTML = "";
-      resetChatLimit();
-      addChatBubble(
-        "Hi, I’ve reviewed your assessment. Ask me anything about your Smile Score or next steps.",
-        "bot"
-      );
-
-      showStep(3);
+      displayAssessmentResults(data, false);
       setStatus(status, "");
     } catch (err) {
       setPhotosLocked(false);
@@ -1396,14 +1531,31 @@
   });
 
   $("#generate-sim").addEventListener("click", async () => {
-    if (!state.frontFile) return;
+    let frontBlob = state.frontFile;
+    if (!frontBlob) {
+      const beforeImg = $("#sim-before");
+      if (beforeImg && beforeImg.src && !beforeImg.src.startsWith("data:image/svg")) {
+        try {
+          const resp = await fetch(beforeImg.src);
+          if (resp.ok) {
+            frontBlob = await resp.blob();
+          }
+        } catch (_fetchBlobErr) {}
+      }
+    }
+    if (!frontBlob) {
+      const genStatus = $("#sim-gen-status");
+      setStatus(genStatus, "Front smile photo not available to generate preview.", true);
+      return;
+    }
+
     const genStatus = $("#sim-gen-status");
     const btn = $("#generate-sim");
     btn.disabled = true;
     setStatus(genStatus, "Creating an illustrative treatment preview…");
 
     const formData = new FormData();
-    formData.append("front_image", state.frontFile);
+    formData.append("front_image", frontBlob, "front.jpg");
     formData.append("report_text", state.reportText || "");
     if (state.findings) {
       formData.append("findings_json", JSON.stringify(state.findings));
@@ -1418,7 +1570,9 @@
       if (!res.ok) throw new Error(data.detail || "Simulation failed.");
 
       const before = $("#sim-before");
-      if (before) before.src = URL.createObjectURL(state.frontFile);
+      if (before && !before.src) {
+        before.src = state.frontFile ? URL.createObjectURL(state.frontFile) : "";
+      }
 
       const after = $("#sim-after");
       if (after) {

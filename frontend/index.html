@@ -131,6 +131,15 @@
             <span class="app-step-meta">Step 1 of 3 · Patient Info</span>
             <h3>Before we begin</h3>
             <p class="panel-lead">Please provide your details so your dentist can review your assessment ahead of your visit.</p>
+
+            <div class="returning-patient-card" id="returning-patient-prompt">
+              <div class="returning-patient-copy">
+                <span class="returning-badge">Returning Patient?</span>
+                <p>Already completed an assessment? Enter your Email & Mobile number below to view your existing results.</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-view-previous">View previous results ↗</button>
+            </div>
+
             <form id="details-form" class="details-form">
               <div class="field-group">
                 <label class="field" for="user-name">
@@ -252,6 +261,15 @@
 
           <div class="panel" id="step-results" data-panel="3" hidden>
             <span class="app-step-meta">Step 3 of 3 · Results</span>
+
+            <div class="returning-welcome-banner" id="returning-welcome-banner" hidden>
+              <div class="returning-banner-icon" aria-hidden="true">👋</div>
+              <div class="returning-banner-body">
+                <h4>Welcome Back</h4>
+                <p id="returning-banner-desc">We found your previous smile assessment. You can view your existing results below.</p>
+              </div>
+            </div>
+
             <div class="results-hero">
               <div class="results-hero-top">
                 <div class="score-ring-wrap">

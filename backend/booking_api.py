@@ -292,6 +292,28 @@ def check_eligibility(email: str, phone: str) -> dict:
     if not email_n and not phone_n:
         return {"ok": False, "reason": "Email and phone are required."}
     sb = get_supabase()
+
+    # 1. Exact match check (returning patient: same email + same phone)
+    if email_n and phone_n:
+        exact_match = db_retry(
+            lambda: sb.table("assessments")
+            .select("id,name,email,phone,created_at")
+            .eq("email", email_n)
+            .eq("phone", phone_n)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute(),
+            label="eligibility exact match lookup",
+        )
+        if exact_match.data:
+            return {
+                "ok": False,
+                "returning_patient": True,
+                "assessment_id": exact_match.data[0]["id"],
+                "reason": "Welcome back! We found your previous smile assessment.",
+            }
+
+    # 2. Check if email matches a different patient
     if email_n:
         by_email = db_retry(
             lambda: sb.table("assessments")
@@ -304,9 +326,12 @@ def check_eligibility(email: str, phone: str) -> dict:
         if by_email.data:
             return {
                 "ok": False,
+                "returning_patient": False,
                 "reason": "You have already taken an assessment with this email.",
                 "field": "email",
             }
+
+    # 3. Check if phone matches a different patient
     if phone_n:
         by_phone = db_retry(
             lambda: sb.table("assessments")
@@ -319,10 +344,12 @@ def check_eligibility(email: str, phone: str) -> dict:
         if by_phone.data:
             return {
                 "ok": False,
+                "returning_patient": False,
                 "reason": "You have already taken an assessment with this mobile number.",
                 "field": "phone",
             }
-    return {"ok": True, "reason": ""}
+
+    return {"ok": True, "returning_patient": False, "reason": ""}
 
 
 def persist_assessment(
@@ -465,7 +492,7 @@ def find_confirmed_booking(*, email: str = "", phone: str = "") -> Optional[dict
 
 
 def find_patient_assessment(*, email: str = "", phone: str = "") -> Optional[dict]:
-    """Find a completed assessment matching normalized email and/or phone."""
+    """Find a completed assessment matching normalized email and/or phone (exact when both provided)."""
     email_n = normalize_email(email)
     phone_n = normalize_phone(phone)
     if not email_n and not phone_n:
@@ -500,13 +527,8 @@ def find_patient_assessment(*, email: str = "", phone: str = "") -> Optional[dic
         return (res.data or [None])[0]
 
     if email_n and phone_n:
-        found = _lookup_exact()
-        if found:
-            return found
-        found = _lookup_field("email", email_n)
-        if found:
-            return found
-        return _lookup_field("phone", phone_n)
+        # Require exact match on both email AND phone to ensure privacy & security
+        return _lookup_exact()
     if email_n:
         return _lookup_field("email", email_n)
     if phone_n:
@@ -683,6 +705,97 @@ def api_verify_patient_assessment(
             "gender": assessment.get("gender") or "",
             "age": assessment.get("age"),
             "city": assessment.get("city") or "",
+        },
+        "db": True,
+    }
+
+
+@public_router.get("/patient/assessment")
+def api_get_patient_assessment(
+    email: str = Query(""),
+    phone: str = Query(""),
+):
+    """Retrieve previous assessment for a returning patient by exact email + phone match."""
+    if not db_ready():
+        return {"found": False, "reason": "Database not available.", "db": False}
+    email_n = normalize_email(email)
+    phone_n = normalize_phone(phone)
+    if not email_n or not phone_n:
+        return {
+            "found": False,
+            "reason": "Both email address and mobile number are required.",
+            "db": True,
+        }
+
+    sb = get_supabase()
+
+    def _load():
+        return (
+            sb.table("assessments")
+            .select("*")
+            .eq("email", email_n)
+            .eq("phone", phone_n)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        res = db_retry(_load, label="patient assessment lookup exact")
+    except Exception:
+        logger.exception("Patient assessment lookup failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Could not retrieve your assessment. Please try again.",
+        )
+
+    if not res.data:
+        return {
+            "found": False,
+            "reason": "No previous assessment was found for these details. You can continue with a new assessment.",
+            "db": True,
+        }
+
+    assessment = res.data[0]
+    photos = {}
+    try:
+        photos = signed_photo_urls(assessment)
+    except Exception:
+        logger.exception("Could not generate signed photo URLs for patient assessment")
+
+    chat_history = get_chat_history(
+        assessment_id=assessment.get("id"),
+        email=email_n,
+        phone=phone_n,
+    )
+
+    findings = assessment.get("findings") or {}
+    simulation_allowed = True
+    if isinstance(findings, dict):
+        visible_concerns = findings.get("visible_concerns")
+        observed_signs = findings.get("observed_signs")
+        if isinstance(visible_concerns, list) and isinstance(observed_signs, list):
+            simulation_allowed = len(visible_concerns) > 0 or len(observed_signs) > 0
+
+    return {
+        "found": True,
+        "returning": True,
+        "assessment": {
+            "id": assessment.get("id"),
+            "name": assessment.get("name") or "",
+            "email": assessment.get("email") or email_n,
+            "phone": assessment.get("phone") or phone_n,
+            "gender": assessment.get("gender") or "",
+            "age": assessment.get("age"),
+            "city": assessment.get("city") or "",
+            "overall_score": assessment.get("overall_score"),
+            "category_scores": assessment.get("category_scores"),
+            "findings": assessment.get("findings"),
+            "report_text": assessment.get("report_text") or "",
+            "created_at": assessment.get("created_at"),
+            "simulation_allowed": simulation_allowed,
+            "photos": photos,
+            "chat_history": chat_history,
         },
         "db": True,
     }
