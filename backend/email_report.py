@@ -60,11 +60,13 @@ def _format_concern_label(label: Any) -> str:
 
 
 def _score_band(score: int) -> tuple[str, str]:
+    if score >= 95:
+        return "Excellent", "#009898"
     if score >= 90:
         return "Good", "#0d7a4f"
-    if score >= 75:
-        return "Watch", "#9a6a00"
-    return "Attention", "#b42318"
+    if score >= 80:
+        return "Please Monitor", "#9a6a00"
+    return "Evaluation Required", "#b42318"
 
 
 def _normalize_category_scores(raw: Any) -> dict[str, int]:
@@ -129,6 +131,43 @@ def _roadmap_items(findings: Any) -> list[str]:
         if text:
             out.append(text)
     return out or ["Book a routine dentist visit to confirm this AI screening."]
+
+
+def get_treatment_recommendations(findings: dict) -> dict:
+    if not isinstance(findings, dict):
+        findings = {}
+    
+    recs = findings.get("treatment_recommendations")
+    if isinstance(recs, dict) and "primary" in recs:
+        p = recs["primary"] or {}
+        if isinstance(p, dict) and p.get("title"):
+            return recs
+            
+    # Fallback to treatment_roadmap
+    roadmap = findings.get("treatment_roadmap") or []
+    if isinstance(roadmap, list) and roadmap:
+        return {
+            "primary": {
+                "title": "Recommended Treatment Pathway",
+                "description": "A customized treatment plan based on your preliminary findings.",
+                "rationale": "Indicated to address the identified visual concerns and restore optimal dental health.",
+                "steps": [str(s) for s in roadmap if str(s).strip()]
+            },
+            "additional": []
+        }
+        
+    return {
+        "primary": {
+            "title": "Routine Dental Consultation",
+            "description": "A complete professional oral examination and cleaning.",
+            "rationale": "Recommended to confirm these preliminary findings and formulate a clinical plan.",
+            "steps": [
+                "Book an appointment with a dentist.",
+                "Undergo a visual and radiographic examination."
+            ]
+        },
+        "additional": []
+    }
 
 
 def build_email_html(*, to_email: str) -> str:
@@ -335,6 +374,10 @@ def build_report_pdf_bytes(
         "CardTitle", parent=styles["Normal"], fontName="Helvetica-Bold",
         fontSize=10, textColor=warm_ink, alignment=TA_CENTER, leading=13,
     )
+    body_large = ParagraphStyle(
+        "BodyLarge", parent=styles["Normal"], fontName="Helvetica-Bold",
+        fontSize=11, textColor=navy, leading=15,
+    )
     footer = ParagraphStyle(
         "Footer", parent=styles["Normal"], fontName="Helvetica",
         fontSize=8, textColor=HexColor("#7a8799"), leading=11,
@@ -347,9 +390,10 @@ def build_report_pdf_bytes(
         _score_band(score_val) if score_val is not None else ("Pending", "#6a7a90")
     )
     band_bg_hex = {
+        "Excellent": "#e0f2f1",
         "Good": "#e6f6ee",
-        "Watch": "#fff4d6",
-        "Attention": "#fde8e6",
+        "Please Monitor": "#fff4d6",
+        "Evaluation Required": "#fde8e6",
         "Pending": "#eef1f6",
     }.get(band_label, "#eef1f6")
 
@@ -483,6 +527,7 @@ def build_report_pdf_bytes(
     story.append(Spacer(1, 14))
 
     photo_items: list[tuple[str, bytes]] = []
+    sim_item = None
     if isinstance(images, list):
         for item in images:
             if (
@@ -492,10 +537,40 @@ def build_report_pdf_bytes(
                 and isinstance(item[1], (bytes, bytearray))
                 and item[1]
             ):
-                photo_items.append((item[0], bytes(item[1])))
-    if photo_items:
-        story.append(SectionTitle("Your uploaded smile", content_width))
-        story.append(Spacer(1, 8))
+                lbl = item[0].strip().lower()
+                if "simulation" in lbl:
+                    sim_item = (item[0], bytes(item[1]))
+                else:
+                    photo_items.append((item[0], bytes(item[1])))
+
+    if sim_item:
+        before_bytes = None
+        for lbl, raw in photo_items:
+            if "front" in lbl.lower():
+                before_bytes = raw
+                break
+        if not before_bytes and photo_items:
+            before_bytes = photo_items[0][1]
+
+        gap = 4 * mm
+        cell_w = (content_width - gap) / 2
+        max_h = 45 * mm
+        cells = []
+        if before_bytes:
+            cell_before = _pdf_photo_cell("Before", before_bytes, max_width=cell_w - 2, max_height=max_h)
+            cells.append(cell_before if cell_before is not None else Paragraph("Before", body))
+        else:
+            cells.append(Paragraph("Before (No photo)", body))
+        cells.append("")
+        cell_after = _pdf_photo_cell("After (Simulated)", sim_item[1], max_width=cell_w - 2, max_height=max_h)
+        cells.append(cell_after if cell_after is not None else Paragraph("After (Simulated)", body))
+        story.append(KeepTogether([
+            SectionTitle("Before & After Smile Preview", content_width),
+            Spacer(1, 8),
+            Table([cells], colWidths=[cell_w, gap, cell_w]),
+            Spacer(1, 14),
+        ]))
+    elif photo_items:
         n = len(photo_items)
         gap = 4 * mm
         cell_w = (content_width - gap * max(0, n - 1)) / n
@@ -512,15 +587,17 @@ def build_report_pdf_bytes(
             else:
                 cells.append(cell)
             widths.append(cell_w)
-        story.append(Table([cells], colWidths=widths))
-        story.append(Spacer(1, 14))
+        story.append(KeepTogether([
+            SectionTitle("Your uploaded smile", content_width),
+            Spacer(1, 8),
+            Table([cells], colWidths=widths),
+            Spacer(1, 14),
+        ]))
 
     cats = _normalize_category_scores(category_scores)
     if not cats and isinstance(findings, dict):
         cats = _normalize_category_scores(findings.get("scores"))
     if cats:
-        story.append(SectionTitle("Category breakdown", content_width))
-        story.append(Spacer(1, 8))
         rows = []
         for key in CATEGORY_ORDER:
             if key not in cats:
@@ -546,8 +623,12 @@ def build_report_pdf_bytes(
         for row in rows:
             if isinstance(row[1], ProgressBar):
                 row[1].width = content_width - 90 * mm
-        story.append(cat_table)
-        story.append(Spacer(1, 14))
+        story.append(KeepTogether([
+            SectionTitle("Category breakdown", content_width),
+            Spacer(1, 8),
+            cat_table,
+            Spacer(1, 14),
+        ]))
 
     concerns = _concern_details(findings)
     story.append(SectionTitle("Visual findings", content_width))
@@ -666,28 +747,112 @@ def build_report_pdf_bytes(
         story.append(Paragraph('<font color="#0a7a7a"><b>No visible concerns</b></font>', body))
 
     story.append(Spacer(1, 6))
-    road_rows = []
-    for idx, item in enumerate(_roadmap_items(findings), start=1):
-        road_rows.append([
-            Paragraph(f'<font color="#0a7a7a"><b>{idx}</b></font>', ParagraphStyle("Step", parent=body, alignment=TA_CENTER)),
-            Paragraph(_esc(item), body_navy),
-        ])
-    road = Table(road_rows, colWidths=[10 * mm, content_width - 10 * mm])
-    road.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BACKGROUND", (0, 0), (0, -1), HexColor("#d9f2f2")),
-        ("LEFTPADDING", (0, 0), (0, -1), 4),
-        ("RIGHTPADDING", (0, 0), (0, -1), 4),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING", (1, 0), (1, -1), 10),
-        ("LINEBELOW", (1, 0), (1, -2), 0.4, line),
-    ]))
     story.append(KeepTogether([
         SectionTitle("What to do next", content_width),
         Spacer(1, 8),
-        road,
     ]))
+
+    recs = get_treatment_recommendations(findings)
+    primary = recs.get("primary") or {}
+    primary_title = primary.get("title") or "Recommended Treatment Pathway"
+    primary_desc = primary.get("description") or ""
+    primary_rat = primary.get("rationale") or ""
+    primary_steps = primary.get("steps") or []
+
+    # Draw Primary Recommendation Card
+    primary_story = []
+    primary_story.append(Paragraph(f'<font size="10" color="#0a7a7a"><b>RECOMMENDED TREATMENT</b></font>', body))
+    primary_story.append(Spacer(1, 3))
+    primary_story.append(Paragraph(f'<b>{_esc(primary_title)}</b>', body_large))
+    if primary_desc:
+        primary_story.append(Spacer(1, 3))
+        primary_story.append(Paragraph(_esc(primary_desc), body_navy))
+    if primary_rat:
+        primary_story.append(Spacer(1, 3))
+        primary_story.append(Paragraph(f'<b>Why:</b> {_esc(primary_rat)}', body_navy))
+    
+    if primary_steps:
+        primary_story.append(Spacer(1, 4))
+        step_table_rows = []
+        for idx, step in enumerate(primary_steps, 1):
+            step_table_rows.append([
+                Paragraph(f'<font color="#0a7a7a"><b>{idx}</b></font>', ParagraphStyle("StepN", parent=body, alignment=TA_CENTER)),
+                Paragraph(_esc(step), body_navy),
+            ])
+        step_table = Table(step_table_rows, colWidths=[8 * mm, content_width - 24 * mm])
+        step_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (0, -1), HexColor("#d9f2f2")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LINEBELOW", (1, 0), (1, -2), 0.4, line),
+        ]))
+        primary_story.append(step_table)
+
+    # Wrap primary_story in a styled table card
+    card_table = Table([[primary_story]], colWidths=[content_width])
+    card_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#effbfb")),
+        ("BOX", (0, 0), (-1, -1), 1, HexColor("#b2e3e3")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.append(KeepTogether([card_table, Spacer(1, 10)]))
+
+    # Additional Recommendations (if any)
+    additional = recs.get("additional") or []
+    if additional:
+        for idx, add in enumerate(additional, 1):
+            add_story = []
+            add_title = add.get("title") or f"Additional Option {idx}"
+            add_desc = add.get("description") or ""
+            add_rat = add.get("rationale") or ""
+            add_steps = add.get("steps") or []
+
+            add_story.append(Paragraph(f'<font size="9" color="#4a607a"><b>ADDITIONAL OPTION & CARE</b></font>', body))
+            add_story.append(Spacer(1, 2))
+            add_story.append(Paragraph(f'<b>{_esc(add_title)}</b>', body_large))
+            if add_desc:
+                add_story.append(Spacer(1, 2))
+                add_story.append(Paragraph(_esc(add_desc), body_navy))
+            if add_rat:
+                add_story.append(Spacer(1, 2))
+                add_story.append(Paragraph(f'<b>Why:</b> {_esc(add_rat)}', body_navy))
+            
+            if add_steps:
+                add_story.append(Spacer(1, 3))
+                step_table_rows = []
+                for s_idx, step in enumerate(add_steps, 1):
+                    step_table_rows.append([
+                        Paragraph(f'<font color="#4a607a"><b>{s_idx}</b></font>', ParagraphStyle("StepA", parent=body, alignment=TA_CENTER)),
+                        Paragraph(_esc(step), body_navy),
+                    ])
+                step_table = Table(step_table_rows, colWidths=[8 * mm, content_width - 24 * mm])
+                step_table.setStyle(TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("BACKGROUND", (0, 0), (0, -1), HexColor("#eef1f6")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("LINEBELOW", (1, 0), (1, -2), 0.4, line),
+                ]))
+                add_story.append(step_table)
+
+            card_table_add = Table([[add_story]], colWidths=[content_width])
+            card_table_add.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.8, HexColor("#cbd5e1")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(KeepTogether([card_table_add, Spacer(1, 8)]))
 
     story.append(Spacer(1, 12))
     rule = Table([[""]], colWidths=[content_width], rowHeights=[1])

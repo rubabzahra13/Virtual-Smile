@@ -251,6 +251,7 @@ def merge_findings(detection: dict, explanation: dict) -> dict:
         "priority_level",
         "priority_order",
         "treatment_roadmap",
+        "treatment_recommendations",
         "notes",
     ):
         if key in explanation:

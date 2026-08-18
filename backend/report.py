@@ -13,6 +13,44 @@ DISCLAIMER = (
 )
 
 
+
+def get_treatment_recommendations(findings: dict) -> dict:
+    if not isinstance(findings, dict):
+        findings = {}
+    
+    recs = findings.get("treatment_recommendations")
+    if isinstance(recs, dict) and "primary" in recs:
+        p = recs["primary"] or {}
+        if isinstance(p, dict) and p.get("title"):
+            return recs
+            
+    # Fallback to treatment_roadmap
+    roadmap = findings.get("treatment_roadmap") or []
+    if isinstance(roadmap, list) and roadmap:
+        return {
+            "primary": {
+                "title": "Recommended Treatment Pathway",
+                "description": "A customized treatment plan based on your preliminary findings.",
+                "rationale": "Indicated to address the identified visual concerns and restore optimal dental health.",
+                "steps": [str(s) for s in roadmap if str(s).strip()]
+            },
+            "additional": []
+        }
+        
+    return {
+        "primary": {
+            "title": "Routine Dental Consultation",
+            "description": "A complete professional oral examination and cleaning.",
+            "rationale": "Recommended to confirm these preliminary findings and formulate a clinical plan.",
+            "steps": [
+                "Book an appointment with a dentist.",
+                "Undergo a visual and radiographic examination."
+            ]
+        },
+        "additional": []
+    }
+
+
 def build_report(
     provider: str,
     model_name: str,
@@ -153,6 +191,32 @@ def build_report(
             lines.append(f" - {step}")
     else:
         lines.append("   (model did not provide a roadmap)")
+    lines.append("")
+
+    # Output structured treatment recommendations
+    recs = get_treatment_recommendations(findings)
+    primary = recs.get("primary") or {}
+    additional = recs.get("additional") or []
+
+    lines.append("6. Suggested Treatment Recommendations")
+    lines.append(f"   Primary Recommendation: {primary.get('title', 'N/A')}")
+    lines.append(f"     Description: {primary.get('description', 'N/A')}")
+    lines.append(f"     Rationale: {primary.get('rationale', 'N/A')}")
+    if primary.get("steps"):
+        lines.append("     Steps:")
+        for step in primary["steps"]:
+            lines.append(f"       - {step}")
+            
+    if additional:
+        lines.append("   Additional Recommendations:")
+        for idx, add in enumerate(additional, 1):
+            lines.append(f"     {idx}. {add.get('title', 'N/A')}")
+            lines.append(f"        Description: {add.get('description', 'N/A')}")
+            lines.append(f"        Rationale: {add.get('rationale', 'N/A')}")
+            if add.get("steps"):
+                lines.append("        Steps:")
+                for step in add["steps"]:
+                    lines.append(f"          - {step}")
     lines.append("")
 
     priority = findings.get("priority_level", "not specified")

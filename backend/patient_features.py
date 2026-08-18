@@ -502,8 +502,30 @@ def _treatment_edit_brief(report_text: Optional[str], findings_json: Optional[st
             # Ensure each concern has an edit even if no observed_sign matched
             edits.append(_map_concern_to_edit(str(concern), options))
 
+        # Parse legacy roadmap steps if present
         for step in findings.get("treatment_roadmap") or []:
             roadmap_lines.append(f"- {step}")
+
+        # Add support for new treatment_recommendations structure
+        recs = findings.get("treatment_recommendations") or {}
+        if isinstance(recs, dict):
+            primary = recs.get("primary") or {}
+            if isinstance(primary, dict):
+                p_title = primary.get("title")
+                p_steps = primary.get("steps") or []
+                if p_title:
+                    roadmap_lines.append(f"- Primary Treatment: {p_title}")
+                for step in p_steps:
+                    roadmap_lines.append(f"  - Step: {step}")
+            additional = recs.get("additional") or []
+            for add in additional:
+                if isinstance(add, dict):
+                    a_title = add.get("title")
+                    a_steps = add.get("steps") or []
+                    if a_title:
+                        roadmap_lines.append(f"- Additional Option: {a_title}")
+                    for step in a_steps:
+                        roadmap_lines.append(f"  - Step: {step}")
 
     if not edits and report_text:
         lowered = report_text.lower()

@@ -577,6 +577,7 @@ async def simulate(
     front_image: UploadFile = File(...),
     report_text: Optional[str] = Form(None),
     findings_json: Optional[str] = Form(None),
+    assessment_id: Optional[str] = Form(None),
 ):
     front_bytes = await front_image.read()
     if not front_bytes:
@@ -594,6 +595,61 @@ async def simulate(
             status_code=500,
             detail=f"Could not create simulation: {type(e).__name__}: {e}",
         )
+
+    if assessment_id and db_ready():
+        try:
+            from db import get_supabase
+            sb = get_supabase()
+            res = sb.table("assessments").select("*").eq("id", assessment_id).limit(1).execute()
+            if res.data:
+                report = res.data[0]
+                import base64
+                sim_bytes = None
+                if "," in data_url:
+                    header, encoded = data_url.split(",", 1)
+                    sim_bytes = base64.b64decode(encoded)
+                else:
+                    sim_bytes = base64.b64decode(data_url)
+
+                if sim_bytes:
+                    from photo_storage import upload_simulation_photo, download_assessment_photo_bytes
+                    sim_path = upload_simulation_photo(assessment_id, sim_bytes)
+                    if sim_path:
+                        curr_findings = report.get("findings") or {}
+                        if not isinstance(curr_findings, dict):
+                            curr_findings = {}
+                        curr_findings["photo_simulation_path"] = sim_path
+
+                        sb.table("assessments").update({"findings": curr_findings}).eq("id", assessment_id).execute()
+
+                        images_list = []
+                        for label, col in (
+                            ("Front smile", "photo_front_path"),
+                            ("Left smile", "photo_left_path"),
+                            ("Right smile", "photo_right_path"),
+                        ):
+                            path = str(report.get(col) or "").strip()
+                            if path:
+                                raw_bytes = download_assessment_photo_bytes(path)
+                                if raw_bytes:
+                                    images_list.append((label, raw_bytes))
+                        images_list.append(("Simulation", sim_bytes))
+
+                        from email_report import send_assessment_email
+                        send_assessment_email(
+                            to_email=report.get("email"),
+                            overall_score=report.get("overall_score"),
+                            findings=curr_findings,
+                            report_text=report.get("report_text") or "",
+                            category_scores=report.get("category_scores"),
+                            images=images_list,
+                            name=report.get("name"),
+                            gender=report.get("gender"),
+                            age=report.get("age"),
+                            city=report.get("city"),
+                        )
+        except Exception as err:
+            print(f"Failed to store simulation and resend email: {type(err).__name__}: {err}")
 
     engine = (os.getenv("SIMULATION_ENGINE") or "qwen").strip().lower()
 

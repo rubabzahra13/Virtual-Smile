@@ -350,7 +350,7 @@
         const count = Number(r.count) || 0;
         const share = Math.round((count / total) * 100);
         const key = String(r.key || "muted");
-        const name = String(r.hint || r.label || "").split(" ")[0] || "Band";
+        const name = String(r.hint || r.label || "").replace(" Required", "").replace("Please ", "");
         return `
           <div class="dash-mix-row is-${escapeHtml(key)}">
             <div class="dash-mix-row-top">
@@ -724,11 +724,8 @@
       return `<span class="ig-score is-none" title="No score"><strong>—</strong></span>`;
     }
     const n = Math.round(Number(score));
-    let cls = "attention";
-    let label = "Attention";
-    if (n >= 90) { cls = "good"; label = "Good"; }
-    else if (n >= 75) { cls = "watch"; label = "Watch"; }
-    return `<span class="ig-score is-${cls}" title="${n} / 100 · ${label}"><strong>${n}</strong></span>`;
+    const band = scoreBand(n);
+    return `<span class="ig-score is-${band.cls}" title="${n} / 100 · ${band.label}"><strong>${n}</strong></span>`;
   }
 
   function formatReportDate(iso) {
@@ -1456,9 +1453,10 @@
   function reportBandKey(score) {
     const n = Number(score);
     if (!Number.isFinite(n)) return "none";
+    if (n >= 95) return "excellent";
     if (n >= 90) return "good";
-    if (n >= 75) return "watch";
-    return "attention";
+    if (n >= 80) return "monitor";
+    return "evaluation";
   }
 
   function reportInDateFilter(iso, filter) {
@@ -1642,10 +1640,11 @@
 
   function scoreBand(score) {
     const n = Number(score);
-    if (!Number.isFinite(n)) return { label: "—", cls: "watch" };
+    if (!Number.isFinite(n)) return { label: "—", cls: "monitor" };
+    if (n >= 95) return { label: "Excellent", cls: "excellent" };
     if (n >= 90) return { label: "Good", cls: "good" };
-    if (n >= 75) return { label: "Watch", cls: "watch" };
-    return { label: "Attention", cls: "attention" };
+    if (n >= 80) return { label: "Please Monitor", cls: "monitor" };
+    return { label: "Evaluation Required", cls: "evaluation" };
   }
 
   function barClass(score) {
@@ -2197,6 +2196,7 @@
     const dots = $("#pm-view-dots");
     const prev = $("#pm-photo-prev");
     const next = $("#pm-photo-next");
+    if (!img && !placeholder && !viewName) return;
     const views = photoCarousel.views;
     const i = photoCarousel.index;
     const loadToken = ++photoLoadSeq;
@@ -2418,7 +2418,34 @@
         ? circumference * (1 - Math.max(0, Math.min(100, score)) / 100)
         : circumference;
 
-    body.innerHTML = `
+    const hasSim = !!photos.simulation;
+    body.classList.toggle("has-sim", hasSim);
+
+    const photoAreaHtml = hasSim
+      ? `
+      <section class="pm-sim-panel">
+        <div class="pm-panel-header">
+          <span class="pm-panel-star">✦</span>
+          <h3>Before & After Smile Preview</h3>
+        </div>
+        <div class="pm-sim-body">
+          <div class="pm-sim-grid">
+            <div class="pm-sim-card">
+              <div class="pm-sim-tag">Before</div>
+              <div class="pm-sim-img-wrap">
+                <img class="pm-sim-img" src="${escapeHtml(photos.front || '')}" alt="Before: Original uploaded smile" />
+              </div>
+            </div>
+            <div class="pm-sim-card">
+              <div class="pm-sim-tag simulated">After (Simulated)</div>
+              <div class="pm-sim-img-wrap">
+                <img class="pm-sim-img" src="${escapeHtml(photos.simulation)}" alt="After: AI-generated smile simulation" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>`
+      : `
       <section class="pm-photo-panel">
         <div class="pm-photo-viewer">
           <div class="pm-photo-callout" id="pm-photo-callout" hidden>
@@ -2440,7 +2467,10 @@
           </div>
           <button type="button" class="pm-photo-arrow next" id="pm-photo-next" aria-label="Next photo">›</button>
         </div>
-      </section>
+      </section>`;
+
+    body.innerHTML = `
+      ${photoAreaHtml}
 
       <div class="pm-col pm-col-side">
       <section class="pm-patient-panel">
@@ -2449,26 +2479,28 @@
             <div class="pm-panel-header">
               <h3>Patient Information</h3>
             </div>
-            <div class="pm-patient-id-row">
-              <div class="pm-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
-              <div>
-                <div class="pm-patient-name">${escapeHtml(name)}</div>
-                <div class="pm-patient-contact">${escapeHtml(r.email || "—")}</div>
-                <div class="pm-patient-contact">${escapeHtml(r.phone || "—")}</div>
+            <div class="pm-patient-info-content">
+              <div class="pm-patient-id-row">
+                <div class="pm-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
+                <div class="pm-patient-meta">
+                  <div class="pm-patient-name">${escapeHtml(name)}</div>
+                  <div class="pm-patient-contact">${escapeHtml(r.email || "—")}</div>
+                  <div class="pm-patient-contact">${escapeHtml(r.phone || "—")}</div>
+                </div>
               </div>
-            </div>
-            <div class="pm-patient-demographics">
-              <div class="pm-demo-item">
-                <span class="pm-demo-label">Gender</span>
-                <span class="pm-demo-val">${escapeHtml(r.gender || linked?.gender || "—")}</span>
-              </div>
-              <div class="pm-demo-item">
-                <span class="pm-demo-label">Age</span>
-                <span class="pm-demo-val">${(r.age != null ? r.age : linked?.age != null ? linked.age : null) != null ? `${escapeHtml(r.age != null ? r.age : linked.age)} yrs` : "—"}</span>
-              </div>
-              <div class="pm-demo-item">
-                <span class="pm-demo-label">City</span>
-                <span class="pm-demo-val">${escapeHtml(r.city || linked?.city || "—")}</span>
+              <div class="pm-patient-demographics">
+                <div class="pm-demo-item">
+                  <span class="pm-demo-label">Gender</span>
+                  <span class="pm-demo-val">${escapeHtml(r.gender || linked?.gender || "—")}</span>
+                </div>
+                <div class="pm-demo-item">
+                  <span class="pm-demo-label">Age</span>
+                  <span class="pm-demo-val">${(r.age != null ? r.age : linked?.age != null ? linked.age : null) != null ? `${escapeHtml(r.age != null ? r.age : linked.age)} yrs` : "—"}</span>
+                </div>
+                <div class="pm-demo-item">
+                  <span class="pm-demo-label">City</span>
+                  <span class="pm-demo-val">${escapeHtml(r.city || linked?.city || "—")}</span>
+                </div>
               </div>
             </div>
           </div>

@@ -1783,9 +1783,22 @@ body.flow-open .hero-shell.is-assessing .hero-card {
   letter-spacing: 0.04em;
 }
 
+.cat-row-excellent .cat-band { color: #009898; }
 .cat-row-good .cat-band { color: #0d7a4f; }
+.cat-row-monitor .cat-band { color: #9a6a00; }
 .cat-row-watch .cat-band { color: #9a6a00; }
+.cat-row-evaluation .cat-band { color: #b42318; }
 .cat-row-attention .cat-band { color: #b42318; }
+
+.score-ring-wrap.tone-excellent .score-ring-value { stroke: #009898; }
+.score-ring-wrap.tone-good .score-ring-value { stroke: #0d7a4f; }
+.score-ring-wrap.tone-monitor .score-ring-value { stroke: #9a6a00; }
+.score-ring-wrap.tone-evaluation .score-ring-value { stroke: #b42318; }
+
+.score-ring-wrap.tone-excellent .score-ring-label span { color: #009898; }
+.score-ring-wrap.tone-good .score-ring-label span { color: #0d7a4f; }
+.score-ring-wrap.tone-monitor .score-ring-label span { color: #9a6a00; }
+.score-ring-wrap.tone-evaluation .score-ring-label span { color: #b42318; }
 
 .patient-report {
   border-top-style: none;
@@ -4711,5 +4724,40 @@ body.camera-open {
   font-weight: 600;
   color: var(--ink);
   word-break: break-word;
+}
+
+/* Redesigned Results Disclaimer Box */
+.results-disclaimer {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  border: 1px dashed #e2e8f0;
+  background: #f8fafc;
+  margin-top: 1.5rem;
+}
+
+.disclaimer-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.disclaimer-content h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy-deep);
+}
+
+.disclaimer-content p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--grey-dark);
+}
+
+.disclaimer-content strong {
+  color: var(--navy-deep);
 }
 

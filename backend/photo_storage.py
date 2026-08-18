@@ -158,6 +158,7 @@ def signed_photo_urls(report: dict[str, Any]) -> dict[str, Optional[str]]:
         "front": None,
         "left": None,
         "right": None,
+        "simulation": None,
     }
     for key, col in (
         ("front", "photo_front_path"),
@@ -165,7 +166,33 @@ def signed_photo_urls(report: dict[str, Any]) -> dict[str, Optional[str]]:
         ("right", "photo_right_path"),
     ):
         out[key] = signed_url_for_path(str(report.get(col) or ""))
+
+    findings = report.get("findings") or {}
+    if isinstance(findings, dict):
+        sim_path = findings.get("photo_simulation_path")
+        if sim_path:
+            out["simulation"] = signed_url_for_path(str(sim_path))
     return out
+
+
+def upload_simulation_photo(assessment_id: str, image_bytes: bytes) -> Optional[str]:
+    """Upload simulation photo to storage and return its path."""
+    if not assessment_id or not image_bytes:
+        return None
+    ensure_photo_bucket()
+    sb = get_supabase()
+    try:
+        compressed = compress_for_admin(image_bytes)
+        path = f"{assessment_id}/simulation.jpg"
+        sb.storage.from_(BUCKET).upload(
+            path,
+            compressed,
+            file_options={"content-type": "image/jpeg", "upsert": "true"},
+        )
+        return path
+    except Exception:
+        logger.exception("Failed to upload simulation photo for assessment %s", assessment_id)
+        return None
 
 
 def download_assessment_photo_bytes(path: str) -> Optional[bytes]:

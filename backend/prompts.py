@@ -220,6 +220,27 @@ Return ONLY valid JSON - no markdown, no code fences:
   "priority_level": "one of: cosmetic, preventative, cosmetic_and_preventative, urgent_referral",
   "priority_order": ["most_urgent_concern_first", "..."],
   "treatment_roadmap": ["Phase 1: ...", "Phase 2: ..."],
+  "treatment_recommendations": {{
+    "primary": {{
+      "title": "Clear and user-friendly title, translating jargon (e.g. 'Gum Health Deep Clean' or 'Alignment Plan')",
+      "description": "Patient-friendly explanation of what this treatment entails, completely free of technical jargon",
+      "rationale": "Clear rationale explaining why this treatment is recommended based on the findings, without using clinical terms",
+      "steps": [
+        "Step 1: Description of the first step (e.g. consultation)",
+        "Step 2: Description of the next step"
+      ]
+    }},
+    "additional": [
+      {{
+        "title": "Title of additional option/care (e.g. 'Stain Removal / Whitening')",
+        "description": "Patient-friendly explanation of the additional treatment",
+        "rationale": "Why this is recommended as a secondary or preventative step",
+        "steps": [
+          "Step 1: Description of the step"
+        ]
+      }}
+    ]
+  }},
   "notes": "one or two plain-English summary sentences"
 }}
 
@@ -227,6 +248,14 @@ Rules:
 - concern_details: one entry per visible_concern; empty list if no concerns
 - priority_order: rank visible_concerns by clinical urgency (infection/structural first, cosmetic last)
 - treatment_roadmap: 2-4 phases; preventative/urgent first, cosmetic later
+- treatment_recommendations:
+  - primary: Identify the most clinically urgent or relevant treatment as the primary recommendation.
+  - additional: List other secondary/preventative/cosmetic treatments as additional recommendations.
+  - For both types, provide a patient-friendly title, a brief description of what it is, a clear rationale for why it is recommended, and a list of sequential steps involved in the treatment path.
+  - Keep clinical terms translated to patient-friendly terms (e.g., use "red/swollen gums" instead of "gingival margins show inflammation", "tartar/plaque buildup" instead of "calculus", etc.).
+  - If no concerns are found:
+    - primary: Default to a Routine Dental Consultation / Checkup.
+    - additional: Empty list [].
 - If no concerns: visible_concerns empty, priority_level cosmetic, roadmap ["Phase 1: Routine checkup to confirm no treatment needed"]
 """
 
@@ -272,11 +301,40 @@ Return ONLY valid JSON:
   "priority_level": "cosmetic | preventative | cosmetic_and_preventative | urgent_referral",
   "priority_order": ["concern_first", "..."],
   "treatment_roadmap": ["Phase 1: ...", "Phase 2: ..."],
+  "treatment_recommendations": {
+    "primary": {
+      "title": "Clear and user-friendly title, translating jargon (e.g. 'Gum Health Deep Clean' or 'Alignment Plan')",
+      "description": "Patient-friendly explanation of what this treatment entails, completely free of technical jargon",
+      "rationale": "Clear rationale explaining why this treatment is recommended based on the findings, without using clinical terms",
+      "steps": [
+        "Step 1: Description of the first step (e.g. consultation)",
+        "Step 2: Description of the next step"
+      ]
+    },
+    "additional": [
+      {
+        "title": "Title of additional option/care (e.g. 'Stain Removal / Whitening')",
+        "description": "Patient-friendly explanation of the additional treatment",
+        "rationale": "Why this is recommended as a secondary or preventative step",
+        "steps": [
+          "Step 1: Description of the step"
+        ]
+      }
+    ]
+  },
   "confidence": 0.0-1.0,
   "notes": "summary"
 }
 
 Plain English only. Empty visible_concerns is valid if nothing obvious is visible.
+- treatment_recommendations:
+  - primary: Identify the most clinically urgent or relevant treatment as the primary recommendation.
+  - additional: List other secondary/preventative/cosmetic treatments as additional recommendations.
+  - For both types, provide a patient-friendly title, a brief description of what it is, a clear rationale for why it is recommended, and a list of sequential steps involved in the treatment path.
+  - Keep clinical terms translated to patient-friendly terms (e.g., use "red/swollen gums" instead of "gingival margins show inflammation", "tartar/plaque buildup" instead of "calculus", etc.).
+  - If no concerns are found:
+    - primary: Default to a Routine Dental Consultation / Checkup.
+    - additional: Empty list [].
 """
 
 
@@ -380,10 +438,36 @@ Write plain English only. Return ONLY valid JSON:
   "priority_level": "cosmetic | preventative | cosmetic_and_preventative | urgent_referral",
   "priority_order": ["concern_first"],
   "treatment_roadmap": ["Phase 1: ...", "Phase 2: ..."],
+  "treatment_recommendations": {{
+    "primary": {{
+      "title": "Clear and user-friendly title, translating jargon (e.g. 'Gum Health Deep Clean' or 'Alignment Plan')",
+      "description": "Patient-friendly explanation of what this treatment entails, completely free of technical jargon",
+      "rationale": "Clear rationale explaining why this treatment is recommended based on the findings, without using clinical terms",
+      "steps": [
+        "Step 1: Description of the first step (e.g. consultation)",
+        "Step 2: Description of the next step"
+      ]
+    }},
+    "additional": [
+      {{
+        "title": "Title of additional option/care (e.g. 'Stain Removal / Whitening')",
+        "description": "Patient-friendly explanation of the additional treatment",
+        "rationale": "Why this is recommended as a secondary or preventative step",
+        "steps": [
+          "Step 1: Description of the step"
+        ]
+      }}
+    ]
+  }},
   "notes": "one or two summary sentences"
 }}
 
-If no concerns: empty visible_concerns, priority_level cosmetic, roadmap ["Phase 1: Routine checkup to confirm no treatment needed"]
+Rules for treatment_recommendations:
+- primary: Identify the most clinically urgent or relevant treatment as the primary recommendation.
+- additional: List other secondary/preventative/cosmetic treatments as additional recommendations.
+- For both types, provide a patient-friendly title, a brief description of what it is, a clear rationale for why it is recommended, and a list of sequential steps involved in the treatment path.
+- Keep clinical terms translated to patient-friendly terms (e.g., use "red/swollen gums" instead of "gingival margins show inflammation", "tartar/plaque buildup" instead of "calculus", etc.).
+- If no concerns: empty visible_concerns, priority_level cosmetic, roadmap ["Phase 1: Routine checkup to confirm no treatment needed"], primary recommendation Routine Dental Consultation / Checkup, additional empty list [].
 """
 
 

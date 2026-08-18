@@ -91,7 +91,42 @@ def get_supabase() -> Client:
     return create_client(url, key)
 
 
+_DB_OFFLINE = False
+
+
+def is_connection_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    name = type(exc).__name__.lower()
+    indicators = (
+        "connecterror",
+        "connectionerror",
+        "gaierror",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "connection refused",
+        "network is unreachable",
+        "timed out",
+        "timeout",
+    )
+    return any(ind in name or ind in msg for ind in indicators)
+
+
+def mark_db_offline():
+    global _DB_OFFLINE
+    if not _DB_OFFLINE:
+        logger.warning("Supabase database connection failed. Marking DB as offline/unavailable.")
+        _DB_OFFLINE = True
+
+
+def reset_db_offline():
+    global _DB_OFFLINE
+    _DB_OFFLINE = False
+
+
 def db_ready() -> bool:
+    global _DB_OFFLINE
+    if _DB_OFFLINE:
+        return False
     try:
         get_supabase()
         return True

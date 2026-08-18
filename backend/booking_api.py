@@ -700,8 +700,12 @@ def api_eligibility(
         return {**check_eligibility(email, phone), "db": True}
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("Eligibility check failed")
+        from db import is_connection_error, mark_db_offline
+        if is_connection_error(exc):
+            mark_db_offline()
+            return {"ok": True, "reason": "", "db": False}
         raise HTTPException(
             status_code=503,
             detail="Could not verify your details. Please try again.",
@@ -718,8 +722,12 @@ def api_my_booking(
         return {"booked": False, "booking": None, "db": False}
     try:
         booking = find_confirmed_booking(email=email, phone=phone)
-    except Exception:
+    except Exception as exc:
         logger.exception("Booking lookup failed")
+        from db import is_connection_error, mark_db_offline
+        if is_connection_error(exc):
+            mark_db_offline()
+            return {"booked": False, "booking": None, "db": False}
         raise HTTPException(
             status_code=503,
             detail="Could not verify booking status. Please try again.",
@@ -810,9 +818,10 @@ def admin_stats(_: str = Depends(require_admin)):
     avg_score = round(sum(scores) / len(scores), 1) if scores else None
 
     buckets = [
-        {"key": "attention", "label": "0–74", "hint": "Attention", "min": 0, "max": 74, "count": 0},
-        {"key": "watch", "label": "75–89", "hint": "Watch", "min": 75, "max": 89, "count": 0},
-        {"key": "good", "label": "90–100", "hint": "Good", "min": 90, "max": 100, "count": 0},
+        {"key": "evaluation", "label": "0–79", "hint": "Evaluation Required", "min": 0, "max": 79, "count": 0},
+        {"key": "monitor", "label": "80–89", "hint": "Please Monitor", "min": 80, "max": 89, "count": 0},
+        {"key": "good", "label": "90–94", "hint": "Good", "min": 90, "max": 94, "count": 0},
+        {"key": "excellent", "label": "95–100", "hint": "Excellent", "min": 95, "max": 100, "count": 0},
     ]
     for score in scores:
         for b in buckets:
@@ -1265,6 +1274,14 @@ def admin_report_pdf(report_id: str, _: str = Depends(require_admin)):
             raw = download_assessment_photo_bytes(path)
             if raw:
                 images.append((label, raw))
+
+    findings = report.get("findings") or {}
+    if isinstance(findings, dict):
+        sim_path = findings.get("photo_simulation_path")
+        if sim_path:
+            raw = download_assessment_photo_bytes(str(sim_path))
+            if raw:
+                images.append(("Simulation", raw))
 
     try:
         pdf_bytes = build_report_pdf_bytes(

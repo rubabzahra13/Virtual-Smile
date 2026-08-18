@@ -529,9 +529,10 @@
   }
 
   function scoreBand(score) {
+    if (score >= 95) return { tone: "excellent", label: "Excellent" };
     if (score >= 90) return { tone: "good", label: "Good" };
-    if (score >= 75) return { tone: "watch", label: "Watch" };
-    return { tone: "attention", label: "Attention" };
+    if (score >= 80) return { tone: "monitor", label: "Please Monitor" };
+    return { tone: "evaluation", label: "Evaluation Required" };
   }
 
   function renderCategories(scores) {
@@ -580,6 +581,37 @@
         if (bar) bar.style.width = `${Math.max(0, Math.min(100, value))}%`;
       });
     });
+  }
+
+  function getTreatmentRecommendations(findings) {
+    if (findings && findings.treatment_recommendations && findings.treatment_recommendations.primary && findings.treatment_recommendations.primary.title) {
+      return findings.treatment_recommendations;
+    }
+    // Fallback to treatment_roadmap
+    const roadmap = Array.isArray(findings?.treatment_roadmap) ? findings.treatment_roadmap : [];
+    if (roadmap.length) {
+      return {
+        primary: {
+          title: "Recommended Treatment Pathway",
+          description: "A customized treatment plan based on your preliminary findings.",
+          rationale: "Indicated to address the identified visual concerns and restore optimal dental health.",
+          steps: roadmap.map(s => String(s).trim()).filter(Boolean)
+        },
+        additional: []
+      };
+    }
+    return {
+      primary: {
+        title: "Routine Dental Consultation",
+        description: "A complete professional oral examination and cleaning.",
+        rationale: "Recommended to confirm these preliminary findings and formulate a clinical plan.",
+        steps: [
+          "Book an appointment with a dentist.",
+          "Undergo a visual and radiographic examination."
+        ]
+      },
+      additional: []
+    };
   }
 
   function renderPatientFindings(findings) {
@@ -643,19 +675,54 @@
       });
     }
 
-    const roadmapItems = Array.isArray(findings?.treatment_roadmap)
-      ? findings.treatment_roadmap
-      : [];
-    if (roadmapItems.length) {
-      roadmapItems.forEach((item, idx) => {
-        const step = document.createElement("div");
-        step.className = "roadmap-item";
-        step.innerHTML = `<span class="roadmap-step">${idx + 1}</span><p>${item}</p>`;
-        roadmap.appendChild(step);
+    const recs = getTreatmentRecommendations(findings);
+    const primary = recs.primary || {};
+    const additional = recs.additional || [];
+
+    // Render Primary Recommendation Card
+    const primaryEl = document.createElement("div");
+    primaryEl.className = "treatment-card primary-treatment-card";
+    primaryEl.innerHTML = `
+      <div class="treatment-badge">Recommended Treatment</div>
+      <h4 class="treatment-title">${primary.title || ""}</h4>
+      <p class="treatment-description">${primary.description || ""}</p>
+      <div class="treatment-rationale"><strong>Why:</strong> ${primary.rationale || ""}</div>
+      ${primary.steps && primary.steps.length ? `
+        <div class="treatment-steps">
+          ${primary.steps.map((step, idx) => `
+            <div class="treatment-step-row">
+              <span class="treatment-step-num">${idx + 1}</span>
+              <span class="treatment-step-text">${step}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    `;
+    roadmap.appendChild(primaryEl);
+
+    // Render Additional Recommendations
+    if (additional && additional.length) {
+      additional.forEach((add) => {
+        const addEl = document.createElement("div");
+        addEl.className = "treatment-card additional-treatment-card";
+        addEl.innerHTML = `
+          <div class="treatment-badge additional">Additional Option & Care</div>
+          <h4 class="treatment-title">${add.title || ""}</h4>
+          <p class="treatment-description">${add.description || ""}</p>
+          <div class="treatment-rationale"><strong>Why:</strong> ${add.rationale || ""}</div>
+          ${add.steps && add.steps.length ? `
+            <div class="treatment-steps">
+              ${add.steps.map((step, idx) => `
+                <div class="treatment-step-row">
+                  <span class="treatment-step-num">${idx + 1}</span>
+                  <span class="treatment-step-text">${step}</span>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+        `;
+        roadmap.appendChild(addEl);
       });
-    } else {
-      roadmap.innerHTML =
-        '<div class="roadmap-item"><span class="roadmap-step">1</span><p>Book a routine dentist visit to confirm this AI screening.</p></div>';
     }
 
     if (findings?.notes) {
@@ -665,10 +732,20 @@
   }
 
   function setScoreRing(score) {
+    const wrap = document.querySelector(".score-ring-wrap");
     const circle = document.querySelector(".score-ring-value");
     const label = $("#overall-score");
     const circumference = 2 * Math.PI * 52;
     const safe = typeof score === "number" ? score : 0;
+    
+    if (wrap) {
+      wrap.classList.remove("tone-excellent", "tone-good", "tone-monitor", "tone-evaluation", "tone-watch", "tone-attention");
+      if (typeof score === "number") {
+        const band = scoreBand(score);
+        wrap.classList.add(`tone-${band.tone}`);
+      }
+    }
+    
     if (label) label.textContent = typeof score === "number" ? score : "-";
     if (circle) {
       circle.style.strokeDasharray = `${circumference}`;
@@ -1275,15 +1352,29 @@
       const before = $("#sim-before");
       const simBlock = $("#sim-block");
       const simSkipNote = $("#sim-skip-note");
+      const simGenCard = $("#sim-generation-card");
+      
+      if (simBlock) simBlock.hidden = true;
+      
       if (state.simulationAllowed) {
-        if (simBlock) simBlock.hidden = false;
+        if (simGenCard) {
+          simGenCard.hidden = false;
+          const btn = $("#generate-sim");
+          if (btn) {
+            btn.hidden = false;
+            btn.disabled = false;
+          }
+          setStatus($("#sim-gen-status"), "");
+        }
         if (simSkipNote) simSkipNote.hidden = true;
-        before.src = URL.createObjectURL(state.frontFile);
-        $("#sim-after").hidden = true;
-        $("#generate-sim").hidden = false;
+        if (before) before.src = URL.createObjectURL(state.frontFile);
+        const after = $("#sim-after");
+        if (after) {
+          after.src = "";
+        }
         setStatus($("#sim-status"), "");
       } else {
-        if (simBlock) simBlock.hidden = true;
+        if (simGenCard) simGenCard.hidden = true;
         if (simSkipNote) simSkipNote.hidden = false;
       }
 
@@ -1306,10 +1397,10 @@
 
   $("#generate-sim").addEventListener("click", async () => {
     if (!state.frontFile) return;
-    const status = $("#sim-status");
+    const genStatus = $("#sim-gen-status");
     const btn = $("#generate-sim");
     btn.disabled = true;
-    setStatus(status, "Creating an illustrative treatment preview…");
+    setStatus(genStatus, "Creating an illustrative treatment preview…");
 
     const formData = new FormData();
     formData.append("front_image", state.frontFile);
@@ -1317,23 +1408,37 @@
     if (state.findings) {
       formData.append("findings_json", JSON.stringify(state.findings));
     }
+    if (state.assessmentId) {
+      formData.append("assessment_id", state.assessmentId);
+    }
 
     try {
       const res = await fetch("/simulate", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Simulation failed.");
 
+      const before = $("#sim-before");
+      if (before) before.src = URL.createObjectURL(state.frontFile);
+
       const after = $("#sim-after");
-      after.src = data.image_data_url;
-      after.hidden = false;
-      btn.hidden = true;
+      if (after) {
+        after.src = data.image_data_url;
+        after.hidden = false;
+      }
+      
+      const simBlock = $("#sim-block");
+      if (simBlock) simBlock.hidden = false;
+
+      const simGenCard = $("#sim-generation-card");
+      if (simGenCard) simGenCard.hidden = true;
+
       setStatus(
-        status,
+        $("#sim-status"),
         data.disclaimer
           || "Illustrative simulation only - report treatments edited onto your uploaded photo."
       );
     } catch (err) {
-      setStatus(status, err.message || "Could not generate preview.", true);
+      setStatus(genStatus, err.message || "Could not generate preview.", true);
       btn.disabled = false;
     }
   });
