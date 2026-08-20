@@ -425,6 +425,20 @@ def persist_assessment(
         return None
 
     try:
+        from leads_api import record_lead_event
+        record_lead_event(
+            assessment_id=str(data["id"]),
+            email=email_n,
+            phone=phone_n,
+            event_type="assessment_completed",
+            title="Assessment Completed",
+            description=f"Smile assessment completed with score {overall_score}/100",
+            actor=(name or "").strip() or "Patient",
+        )
+    except Exception:
+        pass
+
+    try:
         photo_paths = upload_assessment_photos(str(data["id"]), images)
         if photo_paths:
             sb.table("assessments").update(photo_paths).eq("id", data["id"]).execute()
@@ -647,6 +661,22 @@ def create_booking(body: BookingCreate, *, source: str) -> dict:
     data = (res.data or [None])[0]
     if not data:
         raise HTTPException(status_code=500, detail="Booking could not be created.")
+
+    try:
+        from leads_api import record_lead_event
+        time_12 = format_booking_time_12h(slot)
+        record_lead_event(
+            assessment_id=str(assessment_id) if assessment_id else None,
+            email=email_n,
+            phone=phone_n,
+            event_type="appointment_booked",
+            title="Appointment Booked",
+            description=f"In-person appointment scheduled for {day} at {time_12}",
+            actor="Admin" if is_admin else final_name,
+            metadata={"date": day, "time": slot, "source": source},
+        )
+    except Exception:
+        pass
 
     if is_admin:
         data["status"] = "approved"
@@ -1613,6 +1643,37 @@ def admin_patch_booking(
         body.status in {"approved", "confirmed"}
         and cur_status not in {"approved", "confirmed"}
     )
+    if becoming_approved:
+        try:
+            from leads_api import record_lead_event
+            record_lead_event(
+                assessment_id=str(cur.get("assessment_id") or ""),
+                email=str(data.get("email") or cur.get("email") or ""),
+                phone=str(data.get("phone") or cur.get("phone") or ""),
+                event_type="appointment_approved",
+                title="Appointment Approved",
+                description=f"Appointment confirmed for {data.get('date')} at {format_booking_time_12h(data.get('time') or '')}",
+                actor="Admin",
+                metadata={"date": data.get("date"), "time": data.get("time")},
+            )
+        except Exception:
+            pass
+
+    if body.treated is True:
+        try:
+            from leads_api import record_lead_event
+            record_lead_event(
+                assessment_id=str(cur.get("assessment_id") or ""),
+                email=str(data.get("email") or cur.get("email") or ""),
+                phone=str(data.get("phone") or cur.get("phone") or ""),
+                event_type="patient_treated",
+                title="Patient Marked as Treated",
+                description="Completed in-clinic treatment visit",
+                actor="Admin",
+            )
+        except Exception:
+            pass
+
     if becoming_approved:
         logger.info("Triggering confirmation email for booking %s", booking_id)
         try:

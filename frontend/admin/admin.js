@@ -39,6 +39,11 @@
       title:    "New Booking",
       subtitle: "Create an in-person appointment for a walk-in patient.",
     },
+    leads: {
+      eyebrow:  "Marketing",
+      title:    "Leads",
+      subtitle: "Track patient engagement and lead qualification from completed assessments.",
+    },
     hours: {
       eyebrow:  "Settings",
       title:    "Clinic Hours",
@@ -1085,6 +1090,7 @@
       if (active === "reports")      loadReports({ soft: true });
       if (active === "appointments") loadBookings();
       if (active === "hours")        loadSchedules();
+      if (active === "leads")        loadLeads({ soft: true });
       if (openReportId && !$("#patient-modal")?.hidden) {
         refreshOpenReport(true);
       }
@@ -1123,6 +1129,11 @@
     }
     if (name === "appointments") loadBookings();
     if (name === "hours")        loadSchedules();
+    if (name === "leads") {
+      const list = $("#leads-list");
+      const hasRows = !!list?.querySelector(".lead-row, .lead-row-skel");
+      loadLeads({ soft: hasRows });
+    }
     if (name === "book") {
       const status = $("#walkin-status");
       const newBtn = $("#w-new-booking-btn");
@@ -3308,6 +3319,449 @@
     }
   }
 
+  /* ── Leads ──────────────────────────────────────────── */
+
+  let leadsState = {
+    items: [],       // all loaded leads (filtered by server date params)
+    filtered: [],    // client-side filtered by status & chatbot chips
+    page: 1,
+    perPage: 25,
+    statusFilter: "all",
+    chatbotFilter: "all",
+    scoringConfig: null,
+    selectedLeadId: null,
+  };
+
+  function leadsStatusBadgeHtml(status, score) {
+    const cls = status === "Hot" ? "hot" : status === "Warm" ? "warm" : "cold";
+    return `<span class="lead-status-badge badge-${cls}" title="Score: ${escapeHtml(String(score))}">
+      <span class="lead-status-dot dot-${cls}" aria-hidden="true"></span>
+      ${escapeHtml(status)}
+      <span class="lead-score-num">${escapeHtml(String(score))}</span>
+    </span>`;
+  }
+
+  function leadsFormatDate(iso) {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      }).replace(/\b(AM|PM)\b/g, (m) => m.toLowerCase());
+    } catch { return iso; }
+  }
+
+  function renderLeads() {
+    const list = $("#leads-list");
+    const badge = $("#leads-count-badge");
+    const pager = $("#leads-pager");
+    if (!list) return;
+
+    const sf = leadsState.statusFilter;
+    const cf = leadsState.chatbotFilter;
+    leadsState.filtered = leadsState.items.filter((l) => {
+      if (sf !== "all" && l.lead_status !== sf) return false;
+      if (cf === "used" && !l.chatbot_engaged) return false;
+      if (cf === "not_used" && l.chatbot_engaged) return false;
+      return true;
+    });
+
+    const total = leadsState.filtered.length;
+    if (badge) badge.textContent = total === 1 ? "1 lead" : `${total} leads`;
+
+    if (!total) {
+      list.innerHTML = `<p class="reports-empty">No leads match the selected filters.</p>`;
+      if (pager) pager.hidden = true;
+      return;
+    }
+
+    const totalPages = Math.ceil(total / leadsState.perPage);
+    leadsState.page = Math.min(leadsState.page, totalPages);
+    const start = (leadsState.page - 1) * leadsState.perPage;
+    const pageItems = leadsState.filtered.slice(start, start + leadsState.perPage);
+
+    list.innerHTML = pageItems.map((lead, idx) => {
+      const num = start + idx + 1;
+      const name = escapeHtml(lead.name || "Unknown");
+      const email = escapeHtml(lead.email || "—");
+      const phone = escapeHtml(lead.phone || "—");
+      const dateStr = leadsFormatDate(lead.assessment_date);
+
+      // Concerns count
+      const concernsList = Array.isArray(lead.concerns_list) ? lead.concerns_list : [];
+      const concernsCount = lead.concerns_count !== undefined ? lead.concerns_count : concernsList.length;
+
+      // Chatbot
+      const chatEngaged = Boolean(lead.chatbot_engaged);
+
+      const statusHtml = leadsStatusBadgeHtml(lead.lead_status, lead.lead_score);
+      const isSelected = lead.id === leadsState.selectedLeadId;
+
+      return `
+        <div class="lead-row report-row${isSelected ? ' is-selected' : ''}" role="listitem" data-lead-id="${escapeHtml(lead.id)}">
+          <span class="leads-col leads-col-index">${num}</span>
+          <span class="leads-col leads-col-name" title="${name}">${name}</span>
+          <span class="leads-col leads-col-email" title="${email}">${email}</span>
+          <span class="leads-col leads-col-phone" title="${phone}">${phone}</span>
+          <span class="leads-col leads-col-date">${dateStr}</span>
+          <span class="leads-col leads-col-concerns">${concernsCount}</span>
+          <span class="leads-col leads-col-chatbot">
+            <span class="lead-chatbot-pill ${chatEngaged ? 'is-used' : 'is-not-used'}">
+              ${chatEngaged ? 'Used' : 'Not Used'}
+            </span>
+          </span>
+          <span class="leads-col leads-col-status">${statusHtml}</span>
+        </div>`;
+    }).join("");
+
+    // Pager
+    if (totalPages > 1) {
+      if (pager) pager.hidden = false;
+      const metaEl = $("#leads-pager-meta");
+      if (metaEl) metaEl.textContent = `${start + 1}–${Math.min(start + leadsState.perPage, total)} of ${total}`;
+      const pages = $("#leads-pager-pages");
+      if (pages) {
+        pages.innerHTML = Array.from({ length: totalPages }, (_, i) => {
+          const p = i + 1;
+          return `<button type="button" class="sheet-pager-page${p === leadsState.page ? " is-active" : ""}" data-leads-page="${p}">${p}</button>`;
+        }).join("");
+      }
+    } else {
+      if (pager) pager.hidden = true;
+    }
+  }
+
+  function openLeadDrawer(lead) {
+    if (!lead) return;
+    leadsState.selectedLeadId = lead.id;
+
+    const drawer = $("#lead-drawer");
+    const body = $("#ld-body");
+    const title = $("#ld-title");
+    if (!drawer || !body) return;
+
+    // Show drawer immediately
+    drawer.hidden = false;
+    drawer.removeAttribute("hidden");
+    drawer.classList.add("is-open");
+
+    // Highlight selected row in table
+    $$("#leads-list .lead-row").forEach((row) => {
+      row.classList.toggle("is-selected", String(row.dataset.leadId) === String(lead.id));
+    });
+
+    if (title) title.textContent = lead.name || lead.email || "Patient Lead";
+
+    try {
+      const dateStr = leadsFormatDate(lead.assessment_date);
+      const scoreBreakdown = Array.isArray(lead.score_breakdown) ? lead.score_breakdown : [];
+      const leadHistory = Array.isArray(lead.lead_history) ? lead.lead_history : [];
+
+      const concernsList = Array.isArray(lead.concerns_list) ? lead.concerns_list : [];
+      const concernsCount = lead.concerns_count !== undefined ? lead.concerns_count : concernsList.length;
+
+      // Build Lead History HTML
+      const historyHtml = leadHistory.length ? leadHistory.map((ev) => {
+        const evType = ev.event_type || "";
+        let dotClass = "is-activity";
+        if (evType.includes("assessment")) dotClass = "is-assessment";
+        else if (evType.includes("booked")) dotClass = "is-booking";
+        else if (evType.includes("approved") || evType.includes("confirmed")) dotClass = "is-approved";
+        else if (evType.includes("treated")) dotClass = "is-treated";
+
+        const formattedTime = leadsFormatDate(ev.timestamp);
+        return `
+          <div class="ld-timeline-item ${dotClass}">
+            <div class="ld-timeline-dot"></div>
+            <div class="ld-timeline-title-row">
+              <span class="ld-timeline-title">${escapeHtml(ev.title || "Event")}</span>
+              <time class="ld-timeline-time">${escapeHtml(formattedTime)}</time>
+            </div>
+            <p class="ld-timeline-meta">
+              <span class="ld-timeline-actor">${escapeHtml(ev.actor || "System")}</span> · ${escapeHtml(ev.description || "")}
+            </p>
+          </div>`;
+      }).join("") : `<p class="ld-info-val" style="color:var(--ink-muted);font-weight:400;">No lead activity logged yet.</p>`;
+
+      // Build Score Breakdown List HTML
+      const breakdownHtml = scoreBreakdown.map((b) => {
+        const isApplied = Boolean(b.applied);
+        const icon = isApplied
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color:var(--teal-dark);flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>`
+          : `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink-muted);opacity:.5;flex-shrink:0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        const ptsStr = isApplied ? `+${b.points} pts` : `0 pts`;
+
+        return `
+          <li class="ld-breakdown-row${isApplied ? ' is-applied' : ''}">
+            <span class="ld-breakdown-label">${icon} ${escapeHtml(b.label || "")}</span>
+            <span class="ld-breakdown-pts">${ptsStr}</span>
+          </li>`;
+      }).join("");
+
+      body.innerHTML = `
+        <!-- Contact Details -->
+        <div class="ld-section">
+          <h4 class="ld-section-title">Patient Contact Details</h4>
+          <div class="ld-info-card">
+            <div class="ld-info-grid">
+              <div class="ld-info-item">
+                <span class="ld-info-label">Full Name</span>
+                <span class="ld-info-val">${escapeHtml(lead.name || "Unknown")}</span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">Assessment Date</span>
+                <span class="ld-info-val">${escapeHtml(dateStr)}</span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">Email Address</span>
+                <span class="ld-info-val">${escapeHtml(lead.email || "—")}</span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">Phone Number</span>
+                <span class="ld-info-val">${escapeHtml(lead.phone || "—")}</span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">Age &amp; Gender</span>
+                <span class="ld-info-val">${escapeHtml([lead.age ? `${lead.age} yrs` : null, lead.gender].filter(Boolean).join(" · ") || "—")}</span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">City</span>
+                <span class="ld-info-val">${escapeHtml(lead.city || "—")}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lead Score & Breakdown -->
+        <div class="ld-section">
+          <h4 class="ld-section-title">
+            <span>Lead Qualification</span>
+            <span class="ld-info-label">Score Matrix</span>
+          </h4>
+          <div class="ld-score-card">
+            <div class="ld-score-header">
+              <div>
+                <span class="ld-info-label">Current Status</span>
+                <div style="margin-top:0.2rem">
+                  ${leadsStatusBadgeHtml(lead.lead_status, lead.lead_score)}
+                </div>
+              </div>
+              <div style="text-align:right">
+                <span class="ld-info-label">Total Lead Score</span>
+                <div style="font-size:1.4rem;font-weight:800;color:var(--navy);line-height:1.2">${lead.lead_score}<span style="font-size:.8rem;font-weight:600;color:var(--ink-muted)"> / 100</span></div>
+              </div>
+            </div>
+            <div style="border-top:1px solid rgba(32,64,136,0.07);padding-top:0.65rem">
+              <span class="ld-info-label" style="display:block;margin-bottom:0.4rem">Transparent Signal Breakdown:</span>
+              <ul class="ld-score-breakdown-list">
+                ${breakdownHtml}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Treatment Recommendations & Concerns -->
+        <div class="ld-section">
+          <h4 class="ld-section-title">Clinical Assessment Findings</h4>
+          <div class="ld-treatment-card">
+            <div>
+              <span class="ld-info-label">Primary Treatment Recommendation</span>
+              <div class="ld-primary-tx">${escapeHtml(lead.primary_treatment || "General Smile Consultation")}</div>
+            </div>
+            ${concernsCount ? `
+              <div style="margin-top:0.4rem">
+                <span class="ld-info-label">Identified Concerns (${concernsCount})</span>
+                <div class="ld-tx-pills" style="margin-top:0.25rem">
+                  ${concernsList.map(c => `<span class="ld-tx-pill">${escapeHtml(c)}</span>`).join("")}
+                </div>
+              </div>
+            ` : ''}
+            <div style="margin-top:0.75rem;padding-top:0.65rem;border-top:1px solid rgba(32,64,136,0.07)">
+              <button type="button" class="btn btn-secondary ld-report-btn" id="ld-view-report-btn" data-assessment-id="${escapeHtml(lead.id)}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                View Full Assessment Report
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chatbot Engagement -->
+        <div class="ld-section">
+          <h4 class="ld-section-title">Chatbot &amp; Engagement Activity</h4>
+          <div class="ld-info-card">
+            <div class="ld-info-grid">
+              <div class="ld-info-item">
+                <span class="ld-info-label">AI Chatbot Status</span>
+                <span class="ld-info-val">
+                  <span class="lead-chatbot-pill ${lead.chatbot_engaged ? 'is-used' : 'is-not-used'}">
+                    ${lead.chatbot_engaged ? 'Used' : 'Not Used'}
+                  </span>
+                </span>
+              </div>
+              <div class="ld-info-item">
+                <span class="ld-info-label">Questions Asked</span>
+                <span class="ld-info-val">${lead.chatbot_question_count || 0} Questions</span>
+              </div>
+            </div>
+            ${lead.chatbot_engaged ? `
+              <div style="margin-top:0.4rem">
+                <button type="button" class="btn btn-secondary ld-report-btn" id="ld-view-chat-btn" data-lead-id="${escapeHtml(lead.id)}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  View Chatbot Q&amp;A History
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Chronological Timeline -->
+        <div class="ld-section">
+          <h4 class="ld-section-title">Lead History Timeline</h4>
+          <div class="ld-timeline">
+            ${historyHtml}
+          </div>
+        </div>
+      `;
+
+      // Bind inner button actions
+      $("#ld-view-report-btn")?.addEventListener("click", () => {
+        openReport(lead.id);
+      });
+
+      $("#ld-view-chat-btn")?.addEventListener("click", () => {
+        openLeadChatModal(lead.id);
+      });
+    } catch (err) {
+      console.error("Error opening lead drawer:", err);
+    }
+  }
+
+  function closeLeadDrawer() {
+    const drawer = $("#lead-drawer");
+    if (drawer) {
+      drawer.hidden = true;
+      drawer.setAttribute("hidden", "");
+      drawer.classList.remove("is-open");
+    }
+    leadsState.selectedLeadId = null;
+    $$("#leads-list .lead-row").forEach((row) => row.classList.remove("is-selected"));
+  }
+
+  async function loadLeads({ soft = false } = {}) {
+    const list = $("#leads-list");
+    if (!list) return;
+
+    if (!soft) {
+      list.innerHTML = Array.from({ length: 5 }, (_, i) =>
+        `<div class="lead-row lead-row-skel report-row" role="listitem" aria-hidden="true">
+           <span class="leads-col leads-col-index"><span class="skel-line" style="width:1.2rem"></span></span>
+           <span class="leads-col leads-col-name"><span class="skel-block" style="width:8rem;height:.85rem"></span></span>
+           <span class="leads-col leads-col-email"><span class="skel-block" style="width:9rem;height:.75rem"></span></span>
+           <span class="leads-col leads-col-phone"><span class="skel-block" style="width:6rem;height:.75rem"></span></span>
+           <span class="leads-col leads-col-date"><span class="skel-block" style="width:7rem;height:.75rem"></span></span>
+           <span class="leads-col leads-col-concerns"><span class="skel-block" style="width:2rem;height:.75rem"></span></span>
+           <span class="leads-col leads-col-chatbot"><span class="skel-block" style="width:3.5rem;height:1.2rem;border-radius:999px"></span></span>
+           <span class="leads-col leads-col-status"><span class="skel-block" style="width:4.5rem;height:1.4rem;border-radius:.5rem"></span></span>
+         </div>`
+      ).join("");
+    }
+
+    const params = new URLSearchParams();
+    const dateFrom = $("#leads-date-from")?.value || "";
+    const dateTo = $("#leads-date-to")?.value || "";
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const cbFilter = leadsState.chatbotFilter;
+    if (cbFilter && cbFilter !== "all") params.set("chatbot", cbFilter);
+    params.set("limit", "500");
+
+    try {
+      const data = await api(`/admin/api/leads?${params.toString()}`);
+      leadsState.items = Array.isArray(data.items) ? data.items : [];
+      leadsState.scoringConfig = data.scoring_config || null;
+      leadsState.page = 1;
+      renderLeads();
+    } catch (e) {
+      list.innerHTML = `<p class="reports-empty is-error">Could not load leads: ${escapeHtml(e.message || "Unknown error")}</p>`;
+    }
+  }
+
+  function openLeadChatModal(leadId) {
+    const lead = leadsState.items.find((l) => l.id === leadId);
+    if (!lead) return;
+    const history = Array.isArray(lead.chat_history) ? lead.chat_history : [];
+    const modal = $("#patient-chat-modal");
+    const body = $("#pcm-body");
+    const title = $("#pcm-title");
+    if (!modal || !body) return;
+    if (title) title.textContent = `Patient Queries — ${lead.name || lead.email || "Patient"}`;
+
+    if (!history.length) {
+      body.innerHTML = `<p class="pcm-empty">No chatbot conversation recorded for this patient.</p>`;
+    } else {
+      body.innerHTML = history.map((msg) => {
+        const isBot = msg.role === "assistant" || msg.role === "bot";
+        return `<div class="pcm-bubble pcm-bubble-${isBot ? "bot" : "user"}">
+          <span class="pcm-role">${isBot ? "AI" : "Patient"}</span>
+          <p class="pcm-text">${escapeHtml(msg.content || "")}</p>
+        </div>`;
+      }).join("");
+    }
+
+    modal.hidden = false;
+  }
+
+  function exportLeadsCsv() {
+    const leads = leadsState.filtered.length ? leadsState.filtered : leadsState.items;
+    if (!leads.length) return;
+
+    const csvEscape = (val) => {
+      const s = String(val ?? "").replace(/"/g, '""');
+      return /[,"\n\r]/.test(s) ? `"${s}"` : s;
+    };
+
+    const headers = [
+      "Name", "Email", "Phone", "Assessment Date",
+      "Recommended Treatments", "Chatbot Engaged", "Chatbot Q&A",
+      "Lead Status", "Lead Score",
+    ];
+
+    const rows = leads.map((lead) => {
+      const txList = Array.isArray(lead.treatments) ? lead.treatments.filter(Boolean) : [];
+      const chatHistory = Array.isArray(lead.chat_history) ? lead.chat_history : [];
+      const qaPairs = [];
+      for (let i = 0; i < chatHistory.length; i++) {
+        const msg = chatHistory[i];
+        if ((msg.role === "user") && chatHistory[i + 1]?.role === "assistant") {
+          qaPairs.push(`Q: ${msg.content} | A: ${chatHistory[i + 1].content}`);
+        }
+      }
+      return [
+        csvEscape(lead.name || ""),
+        csvEscape(lead.email || ""),
+        csvEscape(lead.phone || ""),
+        csvEscape(lead.assessment_date || ""),
+        csvEscape(txList.join("; ")),
+        csvEscape(lead.chatbot_engaged ? "Yes" : "No"),
+        csvEscape(qaPairs.join("\n")),
+        csvEscape(lead.lead_status),
+        csvEscape(lead.lead_score),
+      ];
+    });
+
+    const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const dateFrom = $("#leads-date-from")?.value || "";
+    const dateTo = $("#leads-date-to")?.value || "";
+    const suffix = dateFrom && dateTo ? `_${dateFrom}_to_${dateTo}` : dateFrom ? `_from_${dateFrom}` : "";
+    a.href = url;
+    a.download = `leads${suffix}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   /* ── Event bindings ─────────────────────────────────── */
   $("#login-form").addEventListener("submit", handleLoginSubmit);
 
@@ -3678,6 +4132,10 @@
     el.addEventListener("click", closeChatHistoryModal)
   );
 
+  $$("[data-close-lead-drawer]").forEach((el) =>
+    el.addEventListener("click", closeLeadDrawer)
+  );
+
   // Cancel / rebook booking
   $("#bookings-list")?.addEventListener("click", (e) => {
     const reportBtn = e.target.closest("[data-view-report]");
@@ -3826,6 +4284,10 @@
     }
     if ($("#dash-filter-wrap")?.classList.contains("is-open")) {
       closeDashFilterMenu();
+      return;
+    }
+    if ($("#lead-drawer") && !$("#lead-drawer").hidden) {
+      closeLeadDrawer();
       return;
     }
     if ($("#patient-chat-modal") && !$("#patient-chat-modal").hidden) {
@@ -4023,6 +4485,109 @@
       if (confirmBtn) confirmBtn.hidden = false;
     }
   });
+
+  // Refresh on window focus
+  window.addEventListener("focus", () => {
+    if (!token) return;
+    refreshAll();
+    if (openReportId && !$("#patient-modal")?.hidden) refreshOpenReport(true);
+  });
+
+  // ── Leads event bindings ────────────────────────────────────────────────
+
+  // Date filter inputs → reload
+  let leadsDateDebounce = null;
+  function triggerLeadsReload() {
+    clearTimeout(leadsDateDebounce);
+    leadsDateDebounce = setTimeout(() => loadLeads(), 400);
+  }
+  $("#leads-date-from")?.addEventListener("change", triggerLeadsReload);
+  $("#leads-date-to")?.addEventListener("change", triggerLeadsReload);
+
+  // Clear date filter
+  $("#leads-date-clear")?.addEventListener("click", () => {
+    const f = $("#leads-date-from");
+    const t = $("#leads-date-to");
+    if (f) f.value = "";
+    if (t) t.value = "";
+    loadLeads();
+  });
+
+  // Status & Chatbot filter chips, lead row drawer trigger
+  $("#panel-leads")?.addEventListener("click", (e) => {
+    const cbChip = e.target.closest("[data-leads-chatbot]");
+    if (cbChip) {
+      $$("[data-leads-chatbot]").forEach((c) => {
+        const on = c === cbChip;
+        c.classList.toggle("is-active", on);
+        c.setAttribute("aria-selected", String(on));
+      });
+      leadsState.chatbotFilter = cbChip.dataset.leadsChatbot;
+      leadsState.page = 1;
+      renderLeads();
+      return;
+    }
+
+    const chip = e.target.closest("[data-leads-status]");
+    if (chip) {
+      $$("[data-leads-status]").forEach((c) => {
+        const on = c === chip;
+        c.classList.toggle("is-active", on);
+        c.setAttribute("aria-selected", String(on));
+      });
+      leadsState.statusFilter = chip.dataset.leadsStatus;
+      leadsState.page = 1;
+      renderLeads();
+      return;
+    }
+
+    // Pager page buttons
+    const pageBtn = e.target.closest("[data-leads-page]");
+    if (pageBtn) {
+      leadsState.page = Number(pageBtn.dataset.leadsPage) || 1;
+      renderLeads();
+      return;
+    }
+
+    // Pager prev/next
+    const navBtn = e.target.closest("[data-pager='leads'][data-dir]");
+    if (navBtn) {
+      const dir = navBtn.dataset.dir;
+      const total = leadsState.filtered.length;
+      const totalPages = Math.ceil(total / leadsState.perPage);
+      if (dir === "prev" && leadsState.page > 1) leadsState.page--;
+      if (dir === "next" && leadsState.page < totalPages) leadsState.page++;
+      renderLeads();
+      return;
+    }
+
+    // Q&A button
+    const qaBtn = e.target.closest(".lead-qa-btn");
+    if (qaBtn) {
+      openLeadChatModal(qaBtn.dataset.leadId);
+      return;
+    }
+
+    // Lead row click -> open Lead Details Drawer
+    const row = e.target.closest(".lead-row[data-lead-id]");
+    if (row && !e.target.closest("button") && !e.target.closest("a")) {
+      const lead = leadsState.items.find((l) => String(l.id) === String(row.dataset.leadId));
+      if (lead) openLeadDrawer(lead);
+      return;
+    }
+  });
+
+  // Direct click handler on #leads-list
+  $("#leads-list")?.addEventListener("click", (e) => {
+    const row = e.target.closest(".lead-row[data-lead-id]");
+    if (row && !e.target.closest("button") && !e.target.closest("a")) {
+      const lead = leadsState.items.find((l) => String(l.id) === String(row.dataset.leadId));
+      if (lead) openLeadDrawer(lead);
+    }
+  });
+
+  // CSV export
+  $("#leads-export-btn")?.addEventListener("click", exportLeadsCsv);
 
   // Schedule form submit
   $("#schedule-form")?.addEventListener("submit", async (e) => {

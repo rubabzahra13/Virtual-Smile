@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 
 from analysis import run_analysis
 from booking_api import admin_router, check_eligibility, persist_assessment, public_router
+from leads_api import leads_router
 from db import db_ready
 from groq_comparison import run_groq_comparison
 from language_utils import contains_forbidden_script, detect_chat_language
@@ -73,6 +74,7 @@ if FRONTEND_DIR.exists():
 
 app.include_router(public_router)
 app.include_router(admin_router)
+app.include_router(leads_router)
 
 
 def _asset_version(filename: str) -> str:
