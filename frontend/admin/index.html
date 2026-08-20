@@ -616,6 +616,25 @@
                 <button type="button" class="reports-chip" data-leads-chatbot="used">Used</button>
                 <button type="button" class="reports-chip" data-leads-chatbot="not_used">Not Used</button>
               </div>
+
+              <!-- City Filter Dropdown (Custom Searchable Dropdown matching App UI) -->
+              <div class="city-autocomplete-field leads-city-autocomplete" id="leads-city-autocomplete-wrap">
+                <div class="autocomplete-control leads-city-control">
+                  <input type="text" id="leads-city-input" class="leads-city-input" placeholder="All Cities" autocomplete="off" aria-label="Filter by patient city" title="Filter by patient city" />
+                  <button type="button" class="autocomplete-toggle leads-city-toggle" id="leads-city-toggle-btn" aria-label="Toggle city list">▼</button>
+                </div>
+                <ul class="autocomplete-list leads-city-list" id="leads-city-list" hidden role="listbox"></ul>
+                <input type="hidden" id="leads-city-filter" value="all" />
+              </div>
+
+              <!-- Age Range Filter -->
+              <div class="leads-age-filter-wrap">
+                <span class="leads-filter-label">Age:</span>
+                <input type="number" id="leads-age-min" class="leads-age-input" placeholder="Min" min="0" max="120" aria-label="Minimum patient age" title="Minimum patient age" />
+                <span class="leads-date-sep">–</span>
+                <input type="number" id="leads-age-max" class="leads-age-input" placeholder="Max" min="0" max="120" aria-label="Maximum patient age" title="Maximum patient age" />
+              </div>
+
               <span class="leads-count-badge" id="leads-count-badge"></span>
             </div>
             <input type="hidden" id="leads-status-filter" value="all" />

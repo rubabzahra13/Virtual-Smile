@@ -374,6 +374,9 @@ def admin_leads(
     date_to: Optional[str] = Query(None, description="End date YYYY-MM-DD (inclusive, uses assessment created_at)"),
     status_filter: Optional[str] = Query(None, alias="status", description="Cold | Warm | Hot | all"),
     chatbot_filter: Optional[str] = Query(None, alias="chatbot", description="used | not_used | all"),
+    city_filter: Optional[str] = Query(None, alias="city", description="Filter by city name or 'all'"),
+    age_min: Optional[int] = Query(None, description="Minimum patient age filter"),
+    age_max: Optional[int] = Query(None, description="Maximum patient age filter"),
     limit: int = Query(500, ge=1, le=2000),
 ):
     """
@@ -411,8 +414,18 @@ def admin_leads(
         logger.exception("Leads: failed to fetch assessments")
         raise HTTPException(status_code=503, detail="Could not load leads. Please try again.")
 
+    # ── Collect available unique cities from patient assessments ───────────
+    city_map: dict[str, str] = {}
+    for a in assessments:
+        raw_city = str(a.get("city") or "").strip()
+        if raw_city:
+            c_key = raw_city.lower()
+            if c_key not in city_map:
+                city_map[c_key] = raw_city.title()
+    available_cities = sorted(list(city_map.values()))
+
     if not assessments:
-        return {"items": [], "total": 0, "scoring_config": LEAD_SCORING}
+        return {"items": [], "total": 0, "available_cities": [], "scoring_config": LEAD_SCORING}
 
     # ── Fetch all bookings in one call ─────────────────────────────────────
     assessment_ids = [str(a["id"]) for a in assessments if a.get("id")]
@@ -475,6 +488,26 @@ def admin_leads(
         aid = str(assessment.get("id") or "")
         email_n = normalize_email(assessment.get("email") or "")
         phone_n = normalize_phone(assessment.get("phone") or "")
+
+        # City filter
+        patient_city = (assessment.get("city") or "").strip()
+        if city_filter and city_filter.strip().lower() not in ("all", ""):
+            if patient_city.lower() != city_filter.strip().lower():
+                continue
+
+        # Age filter
+        raw_age = assessment.get("age")
+        patient_age = None
+        if raw_age is not None and str(raw_age).strip() != "":
+            try:
+                patient_age = int(raw_age)
+            except (ValueError, TypeError):
+                patient_age = None
+
+        if age_min is not None and (patient_age is None or patient_age < age_min):
+            continue
+        if age_max is not None and (patient_age is None or patient_age > age_max):
+            continue
 
         # Merge bookings from all lookup paths (deduplicated by id)
         seen_booking_ids: set[str] = set()
@@ -575,6 +608,7 @@ def admin_leads(
     return {
         "items": items,
         "total": len(items),
+        "available_cities": available_cities,
         "scoring_config": LEAD_SCORING,
     }
 

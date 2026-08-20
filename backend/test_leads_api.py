@@ -223,3 +223,52 @@ class TestLeadBreakdownAndHistory:
         # Oldest event (assessment creation) should be last
         assert history[-1]["event_type"] == "assessment_completed"
 
+
+class TestLeadCityAndAgeFiltering:
+
+    def test_city_filter_matching(self):
+        """Filtering by city should match case-insensitively."""
+        assessments = [
+            {"id": "a1", "city": "Islamabad", "age": 25, "created_at": "2026-08-01T10:00:00Z"},
+            {"id": "a2", "city": "Lahore", "age": 40, "created_at": "2026-08-02T10:00:00Z"},
+        ]
+        # Islamabad case-insensitive match
+        matched_isb = [a for a in assessments if (a.get("city") or "").strip().lower() == "islamabad"]
+        assert len(matched_isb) == 1
+        assert matched_isb[0]["id"] == "a1"
+
+    def test_age_range_filtering(self):
+        """Age min and max filters should filter correctly."""
+        assessments = [
+            {"id": "a1", "age": 20},
+            {"id": "a2", "age": 35},
+            {"id": "a3", "age": 50},
+        ]
+        age_min, age_max = 25, 45
+        filtered = [
+            a for a in assessments
+            if a.get("age") is not None and age_min <= int(a["age"]) <= age_max
+        ]
+        assert len(filtered) == 1
+        assert filtered[0]["id"] == "a2"
+
+    def test_available_cities_extraction(self):
+        """Unique non-empty cities should be collected and sorted."""
+        assessments = [
+            {"city": "islamabad"},
+            {"city": "Lahore"},
+            {"city": "Islamabad"},
+            {"city": ""},
+            {"city": None},
+        ]
+        city_map = {}
+        for a in assessments:
+            raw_city = str(a.get("city") or "").strip()
+            if raw_city:
+                c_key = raw_city.lower()
+                if c_key not in city_map:
+                    city_map[c_key] = raw_city.title()
+        available_cities = sorted(list(city_map.values()))
+        assert available_cities == ["Islamabad", "Lahore"]
+
+

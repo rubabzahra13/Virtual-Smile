@@ -3323,11 +3323,15 @@
 
   let leadsState = {
     items: [],       // all loaded leads (filtered by server date params)
-    filtered: [],    // client-side filtered by status & chatbot chips
+    filtered: [],    // client-side filtered by status, chatbot, city & age
+    availableCities: [], // unique cities extracted from patient assessments
     page: 1,
     perPage: 25,
     statusFilter: "all",
     chatbotFilter: "all",
+    cityFilter: "all",
+    ageMin: null,
+    ageMax: null,
     scoringConfig: null,
     selectedLeadId: null,
   };
@@ -3351,6 +3355,92 @@
     } catch { return iso; }
   }
 
+  function updateCityDropdownOptions(cities) {
+    const hidden = $("#leads-city-filter");
+    const input = $("#leads-city-input");
+    const list = $("#leads-city-list");
+    if (!hidden) return;
+
+    const currentVal = hidden.value || leadsState.cityFilter || "all";
+    if (input && document.activeElement !== input) {
+      input.value = currentVal === "all" ? "All Cities" : currentVal;
+    }
+
+    if (!list) return;
+    const allOptions = ["all", ...(cities || [])];
+    list.innerHTML = allOptions.map((c) => {
+      const label = c === "all" ? "All Cities" : String(c).trim();
+      const isSel = c.toLowerCase() === currentVal.toLowerCase();
+      return `<li class="autocomplete-item ${isSel ? "is-selected" : ""}" data-value="${escapeHtml(c)}" role="option">${escapeHtml(label)}</li>`;
+    }).join("");
+  }
+
+  function initLeadsCityAutocomplete() {
+    const input = $("#leads-city-input");
+    const list = $("#leads-city-list");
+    const hidden = $("#leads-city-filter");
+    if (!input || !list || !hidden) return;
+
+    function renderListItems(query = "") {
+      const q = query.trim().toLowerCase();
+      const currentVal = hidden.value || "all";
+      const cities = leadsState.availableCities || [];
+      const allOptions = ["all", ...cities];
+
+      const filtered = q
+        ? allOptions.filter((c) => (c === "all" ? "all cities" : c).toLowerCase().includes(q))
+        : allOptions;
+
+      if (!filtered.length) {
+        list.innerHTML = `<li class="autocomplete-empty">No matching city</li>`;
+        list.hidden = false;
+        return;
+      }
+
+      list.innerHTML = filtered.map((c) => {
+        const label = c === "all" ? "All Cities" : String(c).trim();
+        const isSel = c.toLowerCase() === currentVal.toLowerCase();
+        return `<li class="autocomplete-item ${isSel ? "is-selected" : ""}" data-value="${escapeHtml(c)}" role="option">${escapeHtml(label)}</li>`;
+      }).join("");
+      list.hidden = false;
+    }
+
+    input.addEventListener("focus", () => {
+      input.select();
+      renderListItems("");
+    });
+
+    input.addEventListener("click", () => {
+      if (list.hidden) {
+        renderListItems("");
+      }
+    });
+
+    input.addEventListener("input", () => {
+      renderListItems(input.value);
+    });
+
+    list.addEventListener("click", (e) => {
+      const item = e.target.closest(".autocomplete-item");
+      if (!item || item.classList.contains("autocomplete-empty")) return;
+      const val = item.dataset.value;
+      hidden.value = val;
+      leadsState.cityFilter = val;
+      input.value = val === "all" ? "All Cities" : val;
+      list.hidden = true;
+      leadsState.page = 1;
+      renderLeads();
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#leads-city-autocomplete-wrap")) {
+        list.hidden = true;
+        const currentVal = hidden.value || "all";
+        input.value = currentVal === "all" ? "All Cities" : currentVal;
+      }
+    });
+  }
+
   function renderLeads() {
     const list = $("#leads-list");
     const badge = $("#leads-count-badge");
@@ -3359,10 +3449,26 @@
 
     const sf = leadsState.statusFilter;
     const cf = leadsState.chatbotFilter;
+    const cityF = leadsState.cityFilter;
+    const ageMin = leadsState.ageMin;
+    const ageMax = leadsState.ageMax;
+
     leadsState.filtered = leadsState.items.filter((l) => {
       if (sf !== "all" && l.lead_status !== sf) return false;
       if (cf === "used" && !l.chatbot_engaged) return false;
       if (cf === "not_used" && l.chatbot_engaged) return false;
+      if (cityF && cityF !== "all") {
+        const pCity = (l.city || "").trim().toLowerCase();
+        if (pCity !== cityF.trim().toLowerCase()) return false;
+      }
+      if (ageMin !== null && ageMin !== "" && !isNaN(ageMin)) {
+        const pAge = l.age !== null && l.age !== undefined && l.age !== "" ? Number(l.age) : null;
+        if (pAge === null || pAge < Number(ageMin)) return false;
+      }
+      if (ageMax !== null && ageMax !== "" && !isNaN(ageMax)) {
+        const pAge = l.age !== null && l.age !== undefined && l.age !== "" ? Number(l.age) : null;
+        if (pAge === null || pAge > Number(ageMax)) return false;
+      }
       return true;
     });
 
@@ -3673,12 +3779,22 @@
     if (dateTo) params.set("date_to", dateTo);
     const cbFilter = leadsState.chatbotFilter;
     if (cbFilter && cbFilter !== "all") params.set("chatbot", cbFilter);
+
+    const cityF = $("#leads-city-filter")?.value || leadsState.cityFilter;
+    if (cityF && cityF !== "all") params.set("city", cityF);
+    const ageMin = $("#leads-age-min")?.value;
+    if (ageMin) params.set("age_min", ageMin);
+    const ageMax = $("#leads-age-max")?.value;
+    if (ageMax) params.set("age_max", ageMax);
+
     params.set("limit", "500");
 
     try {
       const data = await api(`/admin/api/leads?${params.toString()}`);
       leadsState.items = Array.isArray(data.items) ? data.items : [];
+      leadsState.availableCities = Array.isArray(data.available_cities) ? data.available_cities : [];
       leadsState.scoringConfig = data.scoring_config || null;
+      updateCityDropdownOptions(leadsState.availableCities);
       leadsState.page = 1;
       renderLeads();
     } catch (e) {
@@ -4504,14 +4620,48 @@
   $("#leads-date-from")?.addEventListener("change", triggerLeadsReload);
   $("#leads-date-to")?.addEventListener("change", triggerLeadsReload);
 
-  // Clear date filter
+  // Clear date & extra filters button
   $("#leads-date-clear")?.addEventListener("click", () => {
     const f = $("#leads-date-from");
     const t = $("#leads-date-to");
+    const cityHidden = $("#leads-city-filter");
+    const cityInput = $("#leads-city-input");
+    const ageMinInput = $("#leads-age-min");
+    const ageMaxInput = $("#leads-age-max");
     if (f) f.value = "";
     if (t) t.value = "";
+    if (cityHidden) cityHidden.value = "all";
+    if (cityInput) cityInput.value = "All Cities";
+    if (ageMinInput) ageMinInput.value = "";
+    if (ageMaxInput) ageMaxInput.value = "";
+
+    leadsState.cityFilter = "all";
+    leadsState.ageMin = null;
+    leadsState.ageMax = null;
+    leadsState.page = 1;
+
     loadLeads();
   });
+
+  // Initialize Custom Searchable City Autocomplete
+  initLeadsCityAutocomplete();
+
+  // Age range inputs listener (with debounce)
+  let leadsAgeDebounce = null;
+  function handleAgeFilterChange() {
+    clearTimeout(leadsAgeDebounce);
+    leadsAgeDebounce = setTimeout(() => {
+      const minVal = $("#leads-age-min")?.value;
+      const maxVal = $("#leads-age-max")?.value;
+      leadsState.ageMin = minVal !== "" && minVal !== undefined ? Number(minVal) : null;
+      leadsState.ageMax = maxVal !== "" && maxVal !== undefined ? Number(maxVal) : null;
+      leadsState.page = 1;
+      renderLeads();
+    }, 250);
+  }
+
+  $("#leads-age-min")?.addEventListener("input", handleAgeFilterChange);
+  $("#leads-age-max")?.addEventListener("input", handleAgeFilterChange);
 
   // Status & Chatbot filter chips, lead row drawer trigger
   $("#panel-leads")?.addEventListener("click", (e) => {

@@ -7605,6 +7605,151 @@ button.data-card { cursor: pointer; }
   white-space: nowrap;
 }
 
+/* ─── Custom Searchable City Dropdown ─────────────────────── */
+#panel-leads .reports-toolbar,
+#panel-leads .reports-filter-row {
+  overflow: visible !important;
+}
+
+.leads-city-autocomplete {
+  position: relative;
+  min-width: 10.5rem;
+  z-index: 100;
+}
+
+.leads-city-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.leads-city-input {
+  width: 100%;
+  padding: 0.35rem 1.8rem 0.35rem 0.85rem !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(32, 64, 136, 0.16) !important;
+  background: var(--surface) !important;
+  color: var(--navy) !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.leads-city-input:hover,
+.leads-city-input:focus {
+  border-color: var(--teal) !important;
+  box-shadow: 0 0 0 3px rgba(0, 152, 152, 0.12) !important;
+  background: #ffffff !important;
+}
+
+.leads-city-toggle {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--navy);
+  font-size: 0.62rem;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.leads-city-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 13rem;
+  max-width: 18rem;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(32, 64, 136, 0.18) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(18, 40, 90, 0.22), 0 3px 10px rgba(0, 0, 0, 0.08) !important;
+  z-index: 100000 !important;
+}
+
+.leads-city-list .autocomplete-item {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #1b2b48 !important;
+  background: #ffffff !important;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  white-space: nowrap;
+}
+
+.leads-city-list .autocomplete-item:hover,
+.leads-city-list .autocomplete-item.is-highlighted,
+.leads-city-list .autocomplete-item.is-selected {
+  background: #e6f7f5 !important;
+  color: #006666 !important;
+  font-weight: 700 !important;
+}
+
+.leads-age-filter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid rgba(32, 64, 136, 0.16);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  transition: all 0.15s ease;
+}
+
+.leads-age-filter-wrap:focus-within {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(0, 152, 152, 0.12);
+}
+
+.leads-filter-label {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.leads-age-input {
+  width: 3.2rem;
+  border: none;
+  background: transparent;
+  color: var(--navy);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: center;
+  padding: 0.15rem 0;
+  outline: none;
+}
+
+.leads-age-input::placeholder {
+  color: var(--ink-muted);
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.leads-age-input::-webkit-inner-spin-button,
+.leads-age-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.leads-age-input[type=number] {
+  -moz-appearance: textfield;
+}
+
 /* ─── Sheet layout ────────────────────────────────────────── */
 .leads-sheet {
   display: flex;
